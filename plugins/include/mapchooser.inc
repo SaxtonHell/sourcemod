@@ -118,7 +118,7 @@ forward OnMapVoteStarted();
  * @param result	The result of the map vote.
  * @param nextMap	The map that was selected to be the next map, if the map result was MapVoteResult_NewMap.
  */
-forward OnMapVotedFinished(MapVoteResult:result, const String:nextMap[]);
+forward OnMapVoteFinished(MapVoteResult:result, const String:nextMap[]);
 
 
 public SharedPlugin:__pl_mapchooser = 
