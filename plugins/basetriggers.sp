@@ -58,9 +58,14 @@ new Handle:g_Cvar_WinLimit = INVALID_HANDLE;
 new Handle:g_Cvar_FragLimit = INVALID_HANDLE;
 new Handle:g_Cvar_MaxRounds = INVALID_HANDLE;
 
+new Handle:g_CanUseTriggerForward = INVALID_HANDLE;
+
 #define TIMELEFT_ALL_ALWAYS		0		/* Print to all players */
 #define TIMELEFT_ALL_MAYBE		1		/* Print to all players if sm_trigger_show allows */
 #define TIMELEFT_ONE			2		/* Print to a single player */
+
+#define FRIENDLYFIRE_ONE		0		/* Print to a single player */
+#define FRIENDLYFIRE_ALL		1		/* Print to all players if sm_trigger_show allows */
 
 new bool:mapchooser;
 
@@ -74,6 +79,8 @@ public OnPluginStart()
 	g_Cvar_TriggerShow = CreateConVar("sm_trigger_show", "1", "Display triggers message to all players? (0 off, 1 on, def. 1)", 0, true, 0.0, true, 1.0);	
 	g_Cvar_TimeleftInterval = CreateConVar("sm_timeleft_interval", "0.0", "Display timeleft every x seconds. Default 0.", 0, true, 0.0, true, 1800.0);
 	g_Cvar_FriendlyFire = FindConVar("mp_friendlyfire");
+
+	g_CanUseTriggerForward = CreateGlobalForward("BaseTriggers_CanUseTrigger", ExecType:4 /* ET_LowEvent */, Param_Cell, Param_String);
 	
 	RegConsoleCmd("timeleft", Command_Timeleft);
 	RegConsoleCmd("nextmap", Command_Nextmap);
@@ -244,13 +251,26 @@ public Action:Command_FriendlyFire(client, args)
 	if (!IsClientInGame(client))
 		return Plugin_Handled;
 	
-	ShowFriendlyFire(client);
+	ShowFriendlyFire(client, FRIENDLYFIRE_ONE);
 
 	return Plugin_Handled;
 }
 
 public OnClientSayCommand_Post(client, const String:command[], const String:sArgs[])
 {
+	Call_StartForward(g_CanUseTriggerForward);
+	Call_PushCell(client);
+	Call_PushString(sArgs);
+
+	new bool:result = true;
+	Call_Finish(result);
+
+	if (!result)
+	{
+		// another plugin isn't allowing this client to use this chat trigger
+		return;
+	}
+
 	if (strcmp(sArgs, "timeleft", false) == 0)
 	{
 		ShowTimeLeft(client, TIMELEFT_ALL_MAYBE);
@@ -272,7 +292,7 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 	}
 	else if (strcmp(sArgs, "ff", false) == 0)
 	{
-		ShowFriendlyFire(client);
+		ShowFriendlyFire(client, FRIENDLYFIRE_ALL);
 	}
 	else if (strcmp(sArgs, "currentmap", false) == 0)
 	{
@@ -511,7 +531,7 @@ ShowTimeLeft(client, who)
 	}
 }
 
-ShowFriendlyFire(client)
+ShowFriendlyFire(client, who)
 {
 	if (g_Cvar_FriendlyFire != INVALID_HANDLE)
 	{
@@ -524,15 +544,22 @@ ShowFriendlyFire(client)
 		{
 			strcopy(phrase, sizeof(phrase), "Friendly Fire Off");
 		}
-	
-		if(GetConVarInt(g_Cvar_TriggerShow))
+
+		if (who == FRIENDLYFIRE_ALL && GetConVarInt(g_Cvar_TriggerShow))
 		{
+			// displaying to all and sm_trigger_show convar allows it
 			PrintToChatAll("[SM] %t", phrase);
 			LogAction(client, -1, "\"%L\" triggered \"ff\"", client);
 		}
+		else if (who == FRIENDLYFIRE_ALL)
+		{
+			// sm_trigger_show convar does not allow displaying to all
+			PrintToChat(client, "[SM] %t", phrase);
+		}
 		else
 		{
-			PrintToChat(client,"[SM] %t", phrase);
+			// printing to only one client, in response to using the ff command
+			ReplyToCommand(client, "[SM] %t", phrase);
 		}
 	}
 }
