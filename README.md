@@ -1,6 +1,12 @@
 SourceMod
 =========
 
+This Fork
+-------
+- Wishlist features that either haven't been PR'd upstream or were rejected.
+- Other various changes that really don't belong upstream.
+
+
 General
 -------
 - [SourceMod website](http://www.sourcemod.net): Source Engine scripting and server administration
