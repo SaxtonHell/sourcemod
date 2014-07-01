@@ -911,15 +911,17 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 
 		case MenuAction_DrawItem:
 		{
+			new oldStyle;
 			decl String:map[PLATFORM_MAX_PATH];
-			GetMenuItem(menu, param2, map, sizeof(map));
+
+			GetMenuItem(menu, param2, map, sizeof(map), oldStyle);
 
 			if (strcmp(map, VOTE_SPACER, false) == 0)
 			{
 				return ITEMDRAW_SPACER;
 			}
 
-			return ITEMDRAW_DEFAULT;
+			return oldStyle;
 		}
 		
 		case MenuAction_VoteCancel:
