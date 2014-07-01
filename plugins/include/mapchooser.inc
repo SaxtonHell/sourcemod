@@ -106,6 +106,14 @@ native bool:EndOfMapVoteEnabled();
 forward OnNominationRemoved(const String:map[], owner);
 
 /**
+ * Called when mapchooser has initialized the map vote timer.
+ * Note: This could be called multiple times.
+ *
+ * @param timeToMapVote		The amount of time (in seconds) until mapchooser begins a map vote.
+ */
+forward OnMapVoteTimerInitialized(Float:timeToMapVote);
+
+/**
  * Called when mapchooser starts a Map Vote.
  */
 forward OnMapVoteStarted();

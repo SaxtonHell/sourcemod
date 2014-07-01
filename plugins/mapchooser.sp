@@ -101,6 +101,7 @@ new g_mapFileSerial = -1;
 
 new MapChange:g_ChangeTime;
 
+new Handle:g_MapVoteTimerInitializedForward = INVALID_HANDLE;
 new Handle:g_NominationsResetForward = INVALID_HANDLE;
 new Handle:g_MapVoteStartedForward = INVALID_HANDLE;
 new Handle:g_MapVoteItemSelectedForward = INVALID_HANDLE;
@@ -182,6 +183,7 @@ public OnPluginStart()
 		SetConVarBounds(g_Cvar_Bonusroundtime, ConVarBound_Upper, true, 30.0);		
 	}
 	
+	g_MapVoteTimerInitializedForward = CreateGlobalForward("OnMapVoteTimerInitialized", ET_Ignore, Param_Float);
 	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
 	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
 	g_MapVoteItemSelectedForward = CreateGlobalForward( "OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
@@ -345,6 +347,10 @@ SetupTimeleftTimer()
 			WritePackCell(data, _:MapChange_MapEnd);
 			WritePackCell(data, _:INVALID_HANDLE);
 			ResetPack(data);
+
+			Call_StartForward(g_MapVoteTimerInitializedForward);
+			Call_PushFloat(float(time - startTime));
+			Call_Finish();
 		}		
 	}
 }
