@@ -12,6 +12,13 @@ enum NominateResult
 	Nominate_VoteFull,		/** This will only occur if force was set to false */
 };
 
+enum MapVoteResult
+{
+	MapVoteResult_Extended,	/** The map vote ended and the current map has been extended */
+	MapVoteResult_NoChange,	/** The map vote ended and 'No Change' won */
+	MapVoteResult_NewMap,	/** The map vote ended and a new map was selected */
+};
+
 enum MapChange
 {
 	MapChange_Instant,		/** Change map as soon as the voting results have come in */
@@ -104,6 +111,14 @@ forward OnNominationRemoved(const String:map[], owner);
  * Called when mapchooser starts a Map Vote.
  */
 forward OnMapVoteStarted();
+
+/**
+ * Called when mapchooser finishes a Map Vote.
+ *
+ * @param result	The result of the map vote.
+ * @param nextMap	The map that was selected to be the next map, if the map result was MapVoteResult_NewMap.
+ */
+forward OnMapVotedFinished(MapVoteResult:result, const String:nextMap[]);
 
 
 public SharedPlugin:__pl_mapchooser = 

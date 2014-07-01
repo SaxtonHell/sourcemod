@@ -103,6 +103,7 @@ new MapChange:g_ChangeTime;
 
 new Handle:g_NominationsResetForward = INVALID_HANDLE;
 new Handle:g_MapVoteStartedForward = INVALID_HANDLE;
+new Handle:g_MapVoteFinishedForward = INVALID_HANDLE;
 
 /* Upper bound of how many team there could be */
 #define MAXTEAMS 10
@@ -185,6 +186,7 @@ public OnPluginStart()
 	
 	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
 	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
+	g_MapVoteFinishedForward = CreateGlobalForward("OnMapVoteFinished", ET_Ignore, Param_Cell, Param_String);
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -746,7 +748,11 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		g_HasVoteStarted = false;
 		CreateNextVote();
 		SetupTimeleftTimer();
-		
+
+		Call_StartForward(g_MapVoteFinishedForward);
+		Call_PushCell(MapVoteResult_Extended);
+		Call_PushString("");
+		Call_Finish();
 	}
 	else if (strcmp(map, VOTE_DONTCHANGE, false) == 0)
 	{
@@ -756,6 +762,11 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		g_HasVoteStarted = false;
 		CreateNextVote();
 		SetupTimeleftTimer();
+
+		Call_StartForward(g_MapVoteFinishedForward);
+		Call_PushCell(MapVoteResult_NoChange);
+		Call_PushString("");
+		Call_Finish();
 	}
 	else
 	{
@@ -781,6 +792,11 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		
 		PrintToChatAll("[SM] %t", "Nextmap Voting Finished", map, RoundToFloor(float(item_info[0][VOTEINFO_ITEM_VOTES])/float(num_votes)*100), num_votes);
 		LogAction(-1, -1, "Voting for next map has finished. Nextmap: %s.", map);
+
+		Call_StartForward(g_MapVoteFinishedForward);
+		Call_PushCell(MapVoteResult_NoChange);
+		Call_PushString(map);
+		Call_Finish();
 	}	
 }
 
