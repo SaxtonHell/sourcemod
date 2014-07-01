@@ -16,6 +16,8 @@ enum MapVoteResult
 {
 	MapVoteResult_Extended,	/** The map vote ended and the current map has been extended */
 	MapVoteResult_NoChange,	/** The map vote ended and 'No Change' won */
+	MapVoteResult_NoVotes,	/** The map vote ended with no votes and the next map was randomly selected if the sm_mapvote_novote convar was enabled */
+	MapVoteResult_Canceled,	/** The map vote was canceled before a winner could be selected */
 	MapVoteResult_NewMap,	/** The map vote ended and a new map was selected */
 };
 

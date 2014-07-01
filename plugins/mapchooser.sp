@@ -911,11 +911,21 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 					
 					SetNextMap(map);
 					g_MapVoteCompleted = true;
+
+					Call_StartForward(g_MapVoteFinishedForward);
+					Call_PushCell(MapVoteResult_NoVotes);
+					Call_PushString(map);
+					Call_Finish();
 				}
 			}
 			else
 			{
 				// We were actually cancelled. I guess we do nothing.
+
+				Call_StartForward(g_MapVoteFinishedForward);
+				Call_PushCell(MapVoteResult_Canceled);
+				Call_PushString("");
+				Call_Finish();
 			}
 			
 			g_HasVoteStarted = false;
