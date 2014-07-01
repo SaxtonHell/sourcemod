@@ -65,8 +65,8 @@ public OnPluginStart()
 
 	g_Cvar_Chatmode = CreateConVar("sm_chat_mode", "1", "Allows player's to send messages to admin chat.", 0, true, 0.0, true, 1.0);
 
-	g_AdminChatForward = CreateGlobalForward( "BaseChat_OnAdminChat", ET_Ignore, Param_Cell, Param_Cell, Param_String );
-	g_PrivateChatForward = CreateGlobalForward( "BaseChat_OnPrivateChat", ET_Ignore, Param_Cell, Param_Cell, Param_String );
+	g_AdminChatForward = CreateGlobalForward("BaseChat_OnAdminChat", ET_Ignore, Param_Cell, Param_Cell, Param_String);
+	g_PrivateChatForward = CreateGlobalForward("BaseChat_OnPrivateChat", ET_Ignore, Param_Cell, Param_Cell, Param_String);
 
 	RegAdminCmd("sm_say", Command_SmSay, ADMFLAG_CHAT, "sm_say <message> - sends message to all players");
 	RegAdminCmd("sm_csay", Command_SmCsay, ADMFLAG_CHAT, "sm_csay <message> - sends centered message to all players");
