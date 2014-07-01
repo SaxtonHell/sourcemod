@@ -142,8 +142,8 @@ public OnPluginStart()
 	g_Cvar_VoteDuration = CreateConVar("sm_mapvote_voteduration", "20", "Specifies how long the mapvote should be available for.", _, true, 5.0);
 	g_Cvar_RunOff = CreateConVar("sm_mapvote_runoff", "0", "Hold run of votes if winning choice is less than a certain margin", _, true, 0.0, true, 1.0);
 	g_Cvar_RunOffPercent = CreateConVar("sm_mapvote_runoffpercent", "50", "If winning choice has less than this percent of votes, hold a runoff", _, true, 0.0, true, 100.0);
-	g_Cvar_NumSpacers = CreateConVar( "sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
-	g_Cvar_SpacerMode = CreateConVar( "sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
+	g_Cvar_NumSpacers = CreateConVar("sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
+	g_Cvar_SpacerMode = CreateConVar("sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
 	
 	RegAdminCmd("sm_mapvote", Command_Mapvote, ADMFLAG_CHANGEMAP, "sm_mapvote - Forces MapChooser to attempt to run a map vote now.");
 	RegAdminCmd("sm_setnextmap", Command_SetNextmap, ADMFLAG_CHANGEMAP, "sm_setnextmap <map>");
