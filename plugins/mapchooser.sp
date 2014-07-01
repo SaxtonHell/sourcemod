@@ -701,6 +701,9 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 	decl String:map[PLATFORM_MAX_PATH];
 	GetMenuItem(menu, item_info[0][VOTEINFO_ITEM_INDEX], map, sizeof(map));
 
+	decl String:currentMap[PLATFORM_MAX_PATH];
+	GetCurrentMap(currentMap, sizeof(currentMap));
+
 	if (strcmp(map, VOTE_EXTEND, false) == 0)
 	{
 		g_Extends++;
@@ -751,7 +754,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 
 		Call_StartForward(g_MapVoteFinishedForward);
 		Call_PushCell(MapVoteResult_Extended);
-		Call_PushString("");
+		Call_PushString(currentMap);
 		Call_Finish();
 	}
 	else if (strcmp(map, VOTE_DONTCHANGE, false) == 0)
@@ -765,7 +768,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 
 		Call_StartForward(g_MapVoteFinishedForward);
 		Call_PushCell(MapVoteResult_NoChange);
-		Call_PushString("");
+		Call_PushString(currentMap);
 		Call_Finish();
 	}
 	else
@@ -922,9 +925,12 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 			{
 				// We were actually cancelled. I guess we do nothing.
 
+				decl String:currentMap[PLATFORM_MAX_PATH];
+				GetCurrentMap(currentMap, sizeof(currentMap));
+
 				Call_StartForward(g_MapVoteFinishedForward);
 				Call_PushCell(MapVoteResult_Canceled);
-				Call_PushString("");
+				Call_PushString(currentMap);
 				Call_Finish();
 			}
 			

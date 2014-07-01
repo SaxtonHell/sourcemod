@@ -118,7 +118,7 @@ forward OnMapVoteStarted();
  * Called when mapchooser finishes a Map Vote.
  *
  * @param result	The result of the map vote.
- * @param nextMap	The map that was selected to be the next map, if the map result was MapVoteResult_NewMap.
+ * @param nextMap	The map that was selected to be the next map, or the current map if the results specified no map change to occur.
  */
 forward OnMapVoteFinished(MapVoteResult:result, const String:nextMap[]);
 
