@@ -34,6 +34,7 @@
 #pragma semicolon 1
 
 #include <sourcemod>
+#include <basechat>
 
 public Plugin:myinfo = 
 {
@@ -53,6 +54,9 @@ new Handle:g_Cvar_Chatmode = INVALID_HANDLE;
 
 new EngineVersion:g_GameEngine = Engine_Unknown;
 
+new Handle:g_AdminChatForward = INVALID_HANDLE;
+new Handle:g_PrivateChatForward = INVALID_HANDLE;
+
 public OnPluginStart()
 {
 	LoadTranslations("common.phrases");
@@ -60,6 +64,9 @@ public OnPluginStart()
 	g_GameEngine = GetEngineVersion();
 
 	g_Cvar_Chatmode = CreateConVar("sm_chat_mode", "1", "Allows player's to send messages to admin chat.", 0, true, 0.0, true, 1.0);
+
+	g_AdminChatForward = CreateGlobalForward( "BaseChat_OnAdminChat", ET_Ignore, Param_Cell, Param_Cell, Param_String );
+	g_PrivateChatForward = CreateGlobalForward( "BaseChat_OnPrivateChat", ET_Ignore, Param_Cell, Param_Cell, Param_String );
 
 	RegAdminCmd("sm_say", Command_SmSay, ADMFLAG_CHAT, "sm_say <message> - sends message to all players");
 	RegAdminCmd("sm_csay", Command_SmCsay, ADMFLAG_CHAT, "sm_csay <message> - sends centered message to all players");
@@ -207,6 +214,8 @@ public Action:Command_SmHsay(client, args)
 		FormatActivitySource(client, i, nameBuf, sizeof(nameBuf));
 		PrintHintText(i, "%s: %s", nameBuf, text);
 	}
+
+	FireAdminChat(client, BaseChatType_HSay, text);
 	
 	LogAction(client, -1, "\"%L\" triggered sm_hsay (text %s)", client, text);
 	
@@ -244,6 +253,8 @@ public Action:Command_SmTsay(client, args)
 		FormatActivitySource(client, i, nameBuf, sizeof(nameBuf));
 		SendDialogToOne(i, color, "%s: %s", nameBuf, text[len]);
 	}
+
+	FireAdminChat(client, BaseChatType_TSay, text);
 
 	LogAction(client, -1, "\"%L\" triggered sm_tsay (text %s)", client, text);
 	
@@ -304,6 +315,8 @@ public Action:Command_SmMsay(client, args)
 
 	SendPanelToAll(client, text);
 
+	FireAdminChat(client, BaseChatType_MSay, text);
+
 	LogAction(client, -1, "\"%L\" triggered sm_msay (text %s)", client, text);
 	
 	return Plugin_Handled;		
@@ -334,6 +347,8 @@ SendChatToAll(client, const String:message[])
 		
 		PrintToChat(i, "\x04(ALL) %s: \x01%s", nameBuf, message);
 	}
+
+	FireAdminChat(client, BaseChatType_AllSay, message);
 }
 
 DisplayCenterTextToAll(client, const String:message[])
@@ -349,6 +364,8 @@ DisplayCenterTextToAll(client, const String:message[])
 		FormatActivitySource(client, i, nameBuf, sizeof(nameBuf));
 		PrintCenterText(i, "%s: %s", nameBuf, message);
 	}
+
+	FireAdminChat(client, BaseChatType_CSay, message);
 }
 
 SendChatToAdmins(from, const String:message[])
@@ -361,6 +378,8 @@ SendChatToAdmins(from, const String:message[])
 			PrintToChat(i, "\x04(%sADMINS) %N: \x01%s", fromAdmin ? "" : "TO ", from, message);
 		}	
 	}
+
+	FireAdminChat(from, BaseChatType_AdminChat, message);
 }
 
 SendDialogToOne(client, color, const String:text[], any:...)
@@ -390,6 +409,9 @@ SendPrivateChat(client, target, const String:message[])
 	}
 
 	PrintToChat(target, "\x04(Private to %N) %N: \x01%s", target, client, message);
+
+	FirePrivateChat(client, target, message);
+
 	LogAction(client, -1, "\"%L\" triggered sm_psay to \"%L\" (text %s)", client, target, message);
 }
 
@@ -423,4 +445,22 @@ SendPanelToAll(from, String:message[])
 public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2)
 {
 	/* Do nothing */
+}
+
+FireAdminChat(client, BaseChatType:chatType, const String:message[])
+{
+	Call_StartForward(g_AdminChatForward);
+	Call_PushCell(client);
+	Call_PushCell(chatType);
+	Call_PushString(message);
+	Call_Finish();
+}
+
+FirePrivateChat(clientFrom, clientTo, const String:message[])
+{
+	Call_StartForward(g_PrivateChatForward);
+	Call_PushCell(clientFrom);
+	Call_PushCell(clientTo);
+	Call_PushString(message);
+	Call_Finish();
 }
