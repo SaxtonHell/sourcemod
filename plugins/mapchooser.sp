@@ -107,12 +107,11 @@ new Handle:g_MapVoteTimerInitializedForward = INVALID_HANDLE;
 new Handle:g_NominationsResetForward = INVALID_HANDLE;
 new Handle:g_MapVoteStartedForward = INVALID_HANDLE;
 new Handle:g_MapVoteItemSelectedForward = INVALID_HANDLE;
+new Handle:g_MapVoteItemDisplayedForward = INVALID_HANDLE;
 
 /* Upper bound of how many team there could be */
 #define MAXTEAMS 10
 new g_winCount[MAXTEAMS];
-
-#define VOTE_SPACER "##spacer##"
 
 
 public OnPluginStart()
@@ -192,7 +191,8 @@ public OnPluginStart()
 	g_MapVoteTimerInitializedForward = CreateGlobalForward("OnMapVoteTimerInitialized", ET_Ignore, Param_Float);
 	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
 	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
-	g_MapVoteItemSelectedForward = CreateGlobalForward( "OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
+	g_MapVoteItemSelectedForward = CreateGlobalForward("OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
+	g_MapVoteItemDisplayedForward = CreateGlobalForward("OnMapVoteItemDisplayed", ET_Hook, Param_Cell, Param_String, Param_Cell);
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -598,7 +598,7 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 
 	for (new i = 0; i < numSpacers; ++i)
 	{
-		AddMenuItem(g_VoteMenu, VOTE_SPACER, "");
+		AddMenuItem(g_VoteMenu, MAPCHOOSER_VOTE_SPACER, "");
 	}
 	
 	/**
@@ -892,10 +892,25 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 
 		case MenuAction_DisplayItem:
 		{
-			if (GetMenuItemCount(menu) - 1 == param2)
+			decl String:displayBuffer[256];
+			decl String:map[PLATFORM_MAX_PATH], String:buffer[255];
+			GetMenuItem(menu, param2, map, sizeof(map), _, displayBuffer, sizeof(displayBuffer));
+
+			Call_StartForward(g_MapVoteItemDisplayedForward);
+			Call_PushCell(param1);
+			Call_PushStringEx(displayBuffer, sizeof(displayBuffer), SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+			Call_PushCell(sizeof(displayBuffer));
+
+			new Action:result;
+			Call_Finish(result);
+
+			if (result > Plugin_Continue)
 			{
-				decl String:map[PLATFORM_MAX_PATH], String:buffer[255];
-				GetMenuItem(menu, param2, map, sizeof(map));
+				// other plugin wants to override what's displayed on the menu item
+				return RedrawMenuItem(displayBuffer);
+			}
+			else
+			{
 				if (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0)
 				{
 					Format(buffer, sizeof(buffer), "%T", "Extend Map", param1);
@@ -916,7 +931,7 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 
 			GetMenuItem(menu, param2, map, sizeof(map), oldStyle);
 
-			if (strcmp(map, VOTE_SPACER, false) == 0)
+			if (strcmp(map, MAPCHOOSER_VOTE_SPACER, false) == 0)
 			{
 				return ITEMDRAW_SPACER;
 			}
@@ -942,7 +957,7 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 					GetMenuItem(menu, item, map, sizeof(map));
 					
 					// Make sure it's not one of the special items.
-					while (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0 || strcmp(map, VOTE_SPACER, false) == 0)
+					while (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_SPACER, false) == 0)
 					{
 						item = GetRandomInt(0, count - 1);
 						GetMenuItem(menu, item, map, sizeof(map));

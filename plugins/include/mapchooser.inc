@@ -6,6 +6,7 @@
 
 #define MAPCHOOSER_VOTE_EXTEND "##extend##"			/* Extend current map */
 #define MAPCHOOSER_VOTE_DONTCHANGE "##dontchange##"	/* Don't change current map */
+#define MAPCHOOSER_VOTE_SPACER "##spacer##"			/* Invisible spacer */
 
 
 enum NominateResult
@@ -126,6 +127,18 @@ forward OnMapVoteStarted();
  * @param displayText	The display text for the menu item that was selected.
  */
 forward OnMapVoteItemSelected(client, const String:info[], const String:displayText[]);
+
+/**
+ * Called when a map vote item is displayed to a client, in order for the display text to be modified if needed.
+ *
+ * @param client			The client that the menu item is displayed for.
+ * @param info				The menu item info of the displayed item, often the map name or one of the MAPCHOOSER_VOTE string defines.
+ * @param displayText 		A copyback string buffer used to modify the display text of the menu item.
+ * @param maxDisplayText	The maximum size of the copyback displayText string buffer.
+ *
+ * @return					Plugin_Continue to use the default display text, otherwise use the display text in the displayText buffer.
+ */
+forward Action:OnMapVoteItemDisplayed(client, const String:info[], String:displayText[], maxDisplayText);
 
 
 public SharedPlugin:__pl_mapchooser = 
