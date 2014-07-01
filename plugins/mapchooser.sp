@@ -397,7 +397,7 @@ public Event_TeamPlayWinPanel(Handle:event, const String:name[], bool:dontBroadc
 	if (g_ChangeMapAtRoundEnd)
 	{
 		g_ChangeMapAtRoundEnd = false;
-		CreateTimer(2.0, Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(GetMapChangeTime(), Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
 		g_ChangeMapInProgress = true;
 	}
 	
@@ -439,7 +439,7 @@ public Event_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
 	if (g_ChangeMapAtRoundEnd)
 	{
 		g_ChangeMapAtRoundEnd = false;
-		CreateTimer(2.0, Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(GetMapChangeTime(), Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
 		g_ChangeMapInProgress = true;
 	}
 	
@@ -792,7 +792,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		else if (g_ChangeTime == MapChange_Instant)
 		{
 			new Handle:data;
-			CreateDataTimer(2.0, Timer_ChangeMap, data);
+			CreateDataTimer(GetMapChangeTime(), Timer_ChangeMap, data);
 			WritePackString(data, map);
 			g_ChangeMapInProgress = false;
 		}
@@ -1014,6 +1014,22 @@ bool:RemoveStringFromArray(Handle:array, String:str[])
 	}
 	
 	return false;
+}
+
+Float:GetMapChangeTime()
+{
+	new Float:changeTime = 2.0;
+
+	if (g_Cvar_Bonusroundtime != INVALID_HANDLE)
+	{
+		// this mod supports specifying time between rounds, so we can use it to change the map at the end of the in-between time
+		changeTime = GetConVarFloat(g_Cvar_Bonusroundtime) - 1.0;
+
+		if (changeTime < 0.0)
+			changeTime = 2.0;
+	}
+
+	return changeTime;
 }
 
 CreateNextVote()
