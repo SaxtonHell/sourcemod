@@ -3,6 +3,11 @@
 #endif
 #define _mapchooser_included_
 
+
+#define MAPCHOOSER_VOTE_EXTEND "##extend##"			/* Extend current map */
+#define MAPCHOOSER_VOTE_DONTCHANGE "##dontchange##"	/* Don't change current map */
+
+
 enum NominateResult
 {
 	Nominate_Added,			/** The map was added to the nominate list */
@@ -104,6 +109,15 @@ forward OnNominationRemoved(const String:map[], owner);
  * Called when mapchooser starts a Map Vote.
  */
 forward OnMapVoteStarted();
+
+/**
+ * Called when a client selects a menu option during a map vote.
+ *
+ * @param client		The client that selected a map vote option.
+ * @param info			The menu item info of the selected item, often the map name or one of the MAPCHOOSER_VOTE string defines.
+ * @param displayText	The display text for the menu item that was selected.
+ */
+forward OnMapVoteItemSelected(client, const String:info[], const String:displayText[]);
 
 
 public SharedPlugin:__pl_mapchooser = 
