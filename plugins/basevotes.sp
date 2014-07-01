@@ -398,6 +398,12 @@ Float:GetVotePercent(votes, totalVotes)
 
 bool:TestVoteDelay(client)
 {
+	if (CheckCommandAccess(client, "sm_vote_nodelay", ADMFLAG_CONFIG, true))
+	{
+		// this client is not affected by the vote delay
+		return true;
+	}
+
  	new delay = CheckVoteDelay();
  	
  	if (delay > 0)
