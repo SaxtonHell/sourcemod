@@ -58,6 +58,8 @@ new Handle:g_Cvar_WinLimit = INVALID_HANDLE;
 new Handle:g_Cvar_FragLimit = INVALID_HANDLE;
 new Handle:g_Cvar_MaxRounds = INVALID_HANDLE;
 
+new Handle:g_CanUseTriggerForward = INVALID_HANDLE;
+
 #define TIMELEFT_ALL_ALWAYS		0		/* Print to all players */
 #define TIMELEFT_ALL_MAYBE		1		/* Print to all players if sm_trigger_show allows */
 #define TIMELEFT_ONE			2		/* Print to a single player */
@@ -77,6 +79,8 @@ public OnPluginStart()
 	g_Cvar_TriggerShow = CreateConVar("sm_trigger_show", "1", "Display triggers message to all players? (0 off, 1 on, def. 1)", 0, true, 0.0, true, 1.0);	
 	g_Cvar_TimeleftInterval = CreateConVar("sm_timeleft_interval", "0.0", "Display timeleft every x seconds. Default 0.", 0, true, 0.0, true, 1800.0);
 	g_Cvar_FriendlyFire = FindConVar("mp_friendlyfire");
+
+	g_CanUseTriggerForward = CreateGlobalForward("BaseTriggers_CanUseTrigger", ExecType:4 /* ET_LowEvent */, Param_Cell, Param_String);
 	
 	RegConsoleCmd("timeleft", Command_Timeleft);
 	RegConsoleCmd("nextmap", Command_Nextmap);
@@ -254,6 +258,19 @@ public Action:Command_FriendlyFire(client, args)
 
 public OnClientSayCommand_Post(client, const String:command[], const String:sArgs[])
 {
+	Call_StartForward(g_CanUseTriggerForward);
+	Call_PushCell(client);
+	Call_PushString(sArgs);
+
+	new bool:result = true;
+	Call_Finish(result);
+
+	if (!result)
+	{
+		// another plugin isn't allowing this client to use this chat trigger
+		return;
+	}
+
 	if (strcmp(sArgs, "timeleft", false) == 0)
 	{
 		ShowTimeLeft(client, TIMELEFT_ALL_MAYBE);
