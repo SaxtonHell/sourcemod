@@ -78,6 +78,8 @@ new Handle:g_Cvar_EndOfMapVote = INVALID_HANDLE;
 new Handle:g_Cvar_VoteDuration = INVALID_HANDLE;
 new Handle:g_Cvar_RunOff = INVALID_HANDLE;
 new Handle:g_Cvar_RunOffPercent = INVALID_HANDLE;
+new Handle:g_Cvar_NumSpacers = INVALID_HANDLE;
+new Handle:g_Cvar_SpacerMode = INVALID_HANDLE;
 
 new Handle:g_VoteTimer = INVALID_HANDLE;
 new Handle:g_RetryTimer = INVALID_HANDLE;
@@ -110,6 +112,8 @@ new Handle:g_MapVoteItemSelectedForward = INVALID_HANDLE;
 #define MAXTEAMS 10
 new g_winCount[MAXTEAMS];
 
+#define VOTE_SPACER "##spacer##"
+
 
 public OnPluginStart()
 {
@@ -139,6 +143,8 @@ public OnPluginStart()
 	g_Cvar_VoteDuration = CreateConVar("sm_mapvote_voteduration", "20", "Specifies how long the mapvote should be available for.", _, true, 5.0);
 	g_Cvar_RunOff = CreateConVar("sm_mapvote_runoff", "0", "Hold run of votes if winning choice is less than a certain margin", _, true, 0.0, true, 1.0);
 	g_Cvar_RunOffPercent = CreateConVar("sm_mapvote_runoffpercent", "50", "If winning choice has less than this percent of votes, hold a runoff", _, true, 0.0, true, 100.0);
+	g_Cvar_NumSpacers = CreateConVar( "sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
+	g_Cvar_SpacerMode = CreateConVar( "sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
 	
 	RegAdminCmd("sm_mapvote", Command_Mapvote, ADMFLAG_CHANGEMAP, "sm_mapvote - Forces MapChooser to attempt to run a map vote now.");
 	RegAdminCmd("sm_setnextmap", Command_SetNextmap, ADMFLAG_CHANGEMAP, "sm_setnextmap <map>");
@@ -575,11 +581,25 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 	g_HasVoteStarted = true;
 	g_VoteMenu = CreateMenu(Handler_MapVoteMenu, MenuAction:MENU_ACTIONS_ALL);
 	SetMenuTitle(g_VoteMenu, "Vote Nextmap");
+	SetMenuPagination(g_VoteMenu, MENU_NO_PAGINATION);
 	SetVoteResultCallback(g_VoteMenu, Handler_MapVoteFinished);
 
 	/* Call OnMapVoteStarted() Forward */
 	Call_StartForward(g_MapVoteStartedForward);
 	Call_Finish();
+
+	new numSpacers = GetConVarInt(g_Cvar_NumSpacers);
+
+	if (GetConVarInt(g_Cvar_SpacerMode) == 1)
+	{
+		// random spacer mode is enabled
+		numSpacers = GetRandomInt(0, numSpacers);
+	}
+
+	for (new i = 0; i < numSpacers; ++i)
+	{
+		AddMenuItem(g_VoteMenu, VOTE_SPACER, "");
+	}
 	
 	/**
 	 * TODO: Make a proper decision on when to clear the nominations list.
@@ -888,7 +908,20 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 				}
 			}
 		}		
-	
+
+		case MenuAction_DrawItem:
+		{
+			decl String:map[PLATFORM_MAX_PATH];
+			GetMenuItem(menu, param2, map, sizeof(map));
+
+			if (strcmp(map, VOTE_SPACER, false) == 0)
+			{
+				return ITEMDRAW_SPACER;
+			}
+
+			return ITEMDRAW_DEFAULT;
+		}
+		
 		case MenuAction_VoteCancel:
 		{
 			// If we receive 0 votes, pick at random.
@@ -907,7 +940,7 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 					GetMenuItem(menu, item, map, sizeof(map));
 					
 					// Make sure it's not one of the special items.
-					while (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0)
+					while (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0 || strcmp(map, VOTE_SPACER, false) == 0)
 					{
 						item = GetRandomInt(0, count - 1);
 						GetMenuItem(menu, item, map, sizeof(map));
