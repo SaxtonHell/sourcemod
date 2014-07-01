@@ -212,7 +212,7 @@ public Action:Command_Vote(client, args)
 		}	
 	}
 
-	LogAction(client, -1, "\"%L\" initiated a generic vote.", client);
+	LogAction(client, -1, "\"%L\" initiated a generic vote: \"%s\"", client, g_voteArg);
 	ShowActivity2(client, "[SM] ", "%t", "Initiate Vote", g_voteArg);
 	
 	g_voteType = voteType:question;
@@ -278,6 +278,7 @@ public Handler_VoteCallback(Handle:menu, MenuAction:action, param1, param2)
 	}*/
 	else if (action == MenuAction_VoteCancel && param1 == VoteCancel_NoVotes)
 	{
+		LogAction(-1, -1, "Voting for \"%s\" has been cancelled: no votes cast", g_voteArg);
 		PrintToChatAll("[SM] %t", "No Votes Cast");
 	}	
 	else if (action == MenuAction_VoteEnd)
@@ -307,7 +308,7 @@ public Handler_VoteCallback(Handle:menu, MenuAction:action, param1, param2)
 		{
 			/* :TODO: g_voteClient[userid] should be used here and set to -1 if not applicable.
 			 */
-			LogAction(-1, -1, "Vote failed.");
+			LogAction(-1, -1, "Vote failed. %d%% vote required (received %d%% of %d votes)", RoundToNearest(100.0*limit), RoundToNearest(100.0*percent), totalVotes);
 			PrintToChatAll("[SM] %t", "Vote Failed", RoundToNearest(100.0*limit), RoundToNearest(100.0*percent), totalVotes);
 		}
 		else
@@ -323,6 +324,7 @@ public Handler_VoteCallback(Handle:menu, MenuAction:action, param1, param2)
 						strcopy(item, sizeof(item), display);
 					}
 					
+					LogAction(-1, -1, "Vote for \"%s\" ended with: \"%s\"", g_voteArg, item);
 					PrintToChatAll("[SM] %t", "Vote End", g_voteArg, item);
 				}
 				
@@ -398,6 +400,12 @@ Float:GetVotePercent(votes, totalVotes)
 
 bool:TestVoteDelay(client)
 {
+	if (CheckCommandAccess(client, "sm_vote_nodelay", ADMFLAG_CONFIG, true))
+	{
+		// this client is not affected by the vote delay
+		return true;
+	}
+
  	new delay = CheckVoteDelay();
  	
  	if (delay > 0)
