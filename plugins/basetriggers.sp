@@ -62,6 +62,9 @@ new Handle:g_Cvar_MaxRounds = INVALID_HANDLE;
 #define TIMELEFT_ALL_MAYBE		1		/* Print to all players if sm_trigger_show allows */
 #define TIMELEFT_ONE			2		/* Print to a single player */
 
+#define FRIENDLYFIRE_ONE		0		/* Print to a single player */
+#define FRIENDLYFIRE_ALL		1		/* Print to all players if sm_trigger_show allows */
+
 new bool:mapchooser;
 
 new g_TotalRounds;
@@ -244,7 +247,7 @@ public Action:Command_FriendlyFire(client, args)
 	if (!IsClientInGame(client))
 		return Plugin_Handled;
 	
-	ShowFriendlyFire(client);
+	ShowFriendlyFire(client, FRIENDLYFIRE_ONE);
 
 	return Plugin_Handled;
 }
@@ -271,7 +274,7 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 	}
 	else if (strcmp(sArgs, "ff", false) == 0)
 	{
-		ShowFriendlyFire(client);
+		ShowFriendlyFire(client, FRIENDLYFIRE_ALL);
 	}
 	else if (strcmp(sArgs, "currentmap", false) == 0)
 	{
@@ -501,7 +504,7 @@ ShowTimeLeft(client, who)
 	}
 }
 
-ShowFriendlyFire(client)
+ShowFriendlyFire(client, who)
 {
 	if (g_Cvar_FriendlyFire != INVALID_HANDLE)
 	{
@@ -514,14 +517,21 @@ ShowFriendlyFire(client)
 		{
 			strcopy(phrase, sizeof(phrase), "Friendly Fire Off");
 		}
-	
-		if(GetConVarInt(g_Cvar_TriggerShow))
+
+		if (who == FRIENDLYFIRE_ALL && GetConVarInt(g_Cvar_TriggerShow))
 		{
+			// displaying to all and sm_trigger_show convar allows it
 			PrintToChatAll("[SM] %t", phrase);
+		}
+		else if (who == FRIENDLYFIRE_ALL)
+		{
+			// sm_trigger_show convar does not allow displaying to all
+			PrintToChat(client, "[SM] %t", phrase);
 		}
 		else
 		{
-			PrintToChat(client,"[SM] %t", phrase);
+			// printing to only one client, in response to using the ff command
+			ReplyToCommand(client, "[SM] %t", phrase);
 		}
 	}
 }
