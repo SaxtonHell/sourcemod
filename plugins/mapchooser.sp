@@ -78,6 +78,8 @@ new Handle:g_Cvar_EndOfMapVote = INVALID_HANDLE;
 new Handle:g_Cvar_VoteDuration = INVALID_HANDLE;
 new Handle:g_Cvar_RunOff = INVALID_HANDLE;
 new Handle:g_Cvar_RunOffPercent = INVALID_HANDLE;
+new Handle:g_Cvar_NumSpacers = INVALID_HANDLE;
+new Handle:g_Cvar_SpacerMode = INVALID_HANDLE;
 
 new Handle:g_VoteTimer = INVALID_HANDLE;
 new Handle:g_RetryTimer = INVALID_HANDLE;
@@ -101,16 +103,17 @@ new g_mapFileSerial = -1;
 
 new MapChange:g_ChangeTime;
 
+new Handle:g_MapVoteTimerInitializedForward = INVALID_HANDLE;
 new Handle:g_NominationsResetForward = INVALID_HANDLE;
 new Handle:g_MapVoteStartedForward = INVALID_HANDLE;
+new Handle:g_MapVoteItemSelectedForward = INVALID_HANDLE;
+new Handle:g_MapVoteItemDisplayedForward = INVALID_HANDLE;
 new Handle:g_MapVoteFinishedForward = INVALID_HANDLE;
 
 /* Upper bound of how many team there could be */
 #define MAXTEAMS 10
 new g_winCount[MAXTEAMS];
 
-#define VOTE_EXTEND "##extend##"
-#define VOTE_DONTCHANGE "##dontchange##"
 
 public OnPluginStart()
 {
@@ -140,6 +143,8 @@ public OnPluginStart()
 	g_Cvar_VoteDuration = CreateConVar("sm_mapvote_voteduration", "20", "Specifies how long the mapvote should be available for.", _, true, 5.0);
 	g_Cvar_RunOff = CreateConVar("sm_mapvote_runoff", "0", "Hold run of votes if winning choice is less than a certain margin", _, true, 0.0, true, 1.0);
 	g_Cvar_RunOffPercent = CreateConVar("sm_mapvote_runoffpercent", "50", "If winning choice has less than this percent of votes, hold a runoff", _, true, 0.0, true, 100.0);
+	g_Cvar_NumSpacers = CreateConVar("sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
+	g_Cvar_SpacerMode = CreateConVar("sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
 	
 	RegAdminCmd("sm_mapvote", Command_Mapvote, ADMFLAG_CHANGEMAP, "sm_mapvote - Forces MapChooser to attempt to run a map vote now.");
 	RegAdminCmd("sm_setnextmap", Command_SetNextmap, ADMFLAG_CHANGEMAP, "sm_setnextmap <map>");
@@ -184,8 +189,11 @@ public OnPluginStart()
 		SetConVarBounds(g_Cvar_Bonusroundtime, ConVarBound_Upper, true, 30.0);		
 	}
 	
+	g_MapVoteTimerInitializedForward = CreateGlobalForward("OnMapVoteTimerInitialized", ET_Ignore, Param_Float);
 	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
 	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
+	g_MapVoteItemSelectedForward = CreateGlobalForward("OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
+	g_MapVoteItemDisplayedForward = CreateGlobalForward("OnMapVoteItemDisplayed", ET_Hook, Param_Cell, Param_String, Param_Cell);
 	g_MapVoteFinishedForward = CreateGlobalForward("OnMapVoteFinished", ET_Ignore, Param_Cell, Param_String);
 }
 
@@ -347,6 +355,10 @@ SetupTimeleftTimer()
 			WritePackCell(data, _:MapChange_MapEnd);
 			WritePackCell(data, _:INVALID_HANDLE);
 			ResetPack(data);
+
+			Call_StartForward(g_MapVoteTimerInitializedForward);
+			Call_PushFloat(float(time - startTime));
+			Call_Finish();
 		}		
 	}
 }
@@ -387,7 +399,7 @@ public Event_TeamPlayWinPanel(Handle:event, const String:name[], bool:dontBroadc
 	if (g_ChangeMapAtRoundEnd)
 	{
 		g_ChangeMapAtRoundEnd = false;
-		CreateTimer(2.0, Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(GetMapChangeTime(), Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
 		g_ChangeMapInProgress = true;
 	}
 	
@@ -429,7 +441,7 @@ public Event_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
 	if (g_ChangeMapAtRoundEnd)
 	{
 		g_ChangeMapAtRoundEnd = false;
-		CreateTimer(2.0, Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(GetMapChangeTime(), Timer_ChangeMap, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE);
 		g_ChangeMapInProgress = true;
 	}
 	
@@ -571,11 +583,25 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 	g_HasVoteStarted = true;
 	g_VoteMenu = CreateMenu(Handler_MapVoteMenu, MenuAction:MENU_ACTIONS_ALL);
 	SetMenuTitle(g_VoteMenu, "Vote Nextmap");
+	SetMenuPagination(g_VoteMenu, MENU_NO_PAGINATION);
 	SetVoteResultCallback(g_VoteMenu, Handler_MapVoteFinished);
 
 	/* Call OnMapVoteStarted() Forward */
 	Call_StartForward(g_MapVoteStartedForward);
 	Call_Finish();
+
+	new numSpacers = GetConVarInt(g_Cvar_NumSpacers);
+
+	if (GetConVarInt(g_Cvar_SpacerMode) == 1)
+	{
+		// random spacer mode is enabled
+		numSpacers = GetRandomInt(0, numSpacers);
+	}
+
+	for (new i = 0; i < numSpacers; ++i)
+	{
+		AddMenuItem(g_VoteMenu, MAPCHOOSER_VOTE_SPACER, "");
+	}
 	
 	/**
 	 * TODO: Make a proper decision on when to clear the nominations list.
@@ -666,11 +692,11 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 	/* Do we add any special items? */
 	if ((when == MapChange_Instant || when == MapChange_RoundEnd) && GetConVarBool(g_Cvar_DontChange))
 	{
-		AddMenuItem(g_VoteMenu, VOTE_DONTCHANGE, "Don't Change");
+		AddMenuItem(g_VoteMenu, MAPCHOOSER_VOTE_DONTCHANGE, "Don't Change");
 	}
 	else if (GetConVarBool(g_Cvar_Extend) && g_Extends < GetConVarInt(g_Cvar_Extend))
 	{
-		AddMenuItem(g_VoteMenu, VOTE_EXTEND, "Extend Map");
+		AddMenuItem(g_VoteMenu, MAPCHOOSER_VOTE_EXTEND, "Extend Map");
 	}
 	
 	/* There are no maps we could vote for. Don't show anything. */
@@ -704,7 +730,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 	decl String:currentMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
-	if (strcmp(map, VOTE_EXTEND, false) == 0)
+	if (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0)
 	{
 		g_Extends++;
 		
@@ -757,7 +783,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		Call_PushString(currentMap);
 		Call_Finish();
 	}
-	else if (strcmp(map, VOTE_DONTCHANGE, false) == 0)
+	else if (strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0)
 	{
 		PrintToChatAll("[SM] %t", "Current Map Stays", RoundToFloor(float(item_info[0][VOTEINFO_ITEM_VOTES])/float(num_votes)*100), num_votes);
 		LogAction(-1, -1, "Voting for next map has finished. 'No Change' was the winner");
@@ -780,7 +806,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		else if (g_ChangeTime == MapChange_Instant)
 		{
 			new Handle:data;
-			CreateDataTimer(2.0, Timer_ChangeMap, data);
+			CreateDataTimer(GetMapChangeTime(), Timer_ChangeMap, data);
 			WritePackString(data, map);
 			g_ChangeMapInProgress = false;
 		}
@@ -869,25 +895,69 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 			SetPanelTitle(panel, buffer);
 		}		
 		
+		case MenuAction_Select:
+		{
+			decl String:map[PLATFORM_MAX_PATH];
+			decl String:display[256];
+
+			GetMenuItem(menu, param2, map, sizeof(map), _, display, sizeof(display));
+
+			Call_StartForward(g_MapVoteItemSelectedForward);
+			Call_PushCell(param1);
+			Call_PushString(map);
+			Call_PushString(display);
+			Call_Finish();
+		}
+
 		case MenuAction_DisplayItem:
 		{
-			if (GetMenuItemCount(menu) - 1 == param2)
+			decl String:displayBuffer[256];
+			decl String:map[PLATFORM_MAX_PATH], String:buffer[255];
+			GetMenuItem(menu, param2, map, sizeof(map), _, displayBuffer, sizeof(displayBuffer));
+
+			Call_StartForward(g_MapVoteItemDisplayedForward);
+			Call_PushCell(param1);
+			Call_PushStringEx(displayBuffer, sizeof(displayBuffer), SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+			Call_PushCell(sizeof(displayBuffer));
+
+			new Action:result;
+			Call_Finish(result);
+
+			if (result > Plugin_Continue)
 			{
-				decl String:map[PLATFORM_MAX_PATH], String:buffer[255];
-				GetMenuItem(menu, param2, map, sizeof(map));
-				if (strcmp(map, VOTE_EXTEND, false) == 0)
+				// other plugin wants to override what's displayed on the menu item
+				return RedrawMenuItem(displayBuffer);
+			}
+			else
+			{
+				if (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0)
 				{
 					Format(buffer, sizeof(buffer), "%T", "Extend Map", param1);
 					return RedrawMenuItem(buffer);
 				}
-				else if (strcmp(map, VOTE_DONTCHANGE, false) == 0)
+				else if (strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0)
 				{
 					Format(buffer, sizeof(buffer), "%T", "Dont Change", param1);
 					return RedrawMenuItem(buffer);					
 				}
 			}
 		}		
-	
+
+		case MenuAction_DrawItem:
+		{
+			new oldStyle;
+			decl String:map[PLATFORM_MAX_PATH];
+
+			GetMenuItem(menu, param2, map, sizeof(map), oldStyle);
+
+			if (strcmp(map, MAPCHOOSER_VOTE_SPACER, false) == 0)
+			{
+				return ITEMDRAW_SPACER;
+			}
+
+			return oldStyle;
+		}
+		
 		case MenuAction_VoteCancel:
 		{
 			// If we receive 0 votes, pick at random.
@@ -899,14 +969,14 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 				
 				// Make sure the first map in the menu isn't one of the special items.
 				// This would mean there are no real maps in the menu, because the special items are added after all maps. Don't do anything if that's the case.
-				if (strcmp(map, VOTE_EXTEND, false) != 0 && strcmp(map, VOTE_DONTCHANGE, false) != 0)
+				if (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) != 0 && strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) != 0)
 				{
 					// Get a random map from the list.
 					new item = GetRandomInt(0, count - 1);
 					GetMenuItem(menu, item, map, sizeof(map));
 					
 					// Make sure it's not one of the special items.
-					while (strcmp(map, VOTE_EXTEND, false) == 0 || strcmp(map, VOTE_DONTCHANGE, false) == 0)
+					while (strcmp(map, MAPCHOOSER_VOTE_EXTEND, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_DONTCHANGE, false) == 0 || strcmp(map, MAPCHOOSER_VOTE_SPACER, false) == 0)
 					{
 						item = GetRandomInt(0, count - 1);
 						GetMenuItem(menu, item, map, sizeof(map));
@@ -976,6 +1046,22 @@ bool:RemoveStringFromArray(Handle:array, String:str[])
 	}
 	
 	return false;
+}
+
+Float:GetMapChangeTime()
+{
+	new Float:changeTime = 2.0;
+
+	if (g_Cvar_Bonusroundtime != INVALID_HANDLE)
+	{
+		// this mod supports specifying time between rounds, so we can use it to change the map at the end of the in-between time
+		changeTime = GetConVarFloat(g_Cvar_Bonusroundtime) - 1.0;
+
+		if (changeTime < 0.0)
+			changeTime = 2.0;
+	}
+
+	return changeTime;
 }
 
 CreateNextVote()
