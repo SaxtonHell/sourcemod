@@ -263,6 +263,7 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 		if(GetConVarInt(g_Cvar_TriggerShow))
 		{
 			PrintToChatAll("[SM] %t", "Thetime", ctime);
+			LogAction(client, -1, "\"%L\" triggered \"thetime\"", client);
 		}
 		else
 		{
@@ -281,6 +282,7 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 		if(GetConVarInt(g_Cvar_TriggerShow))
 		{
 			PrintToChatAll("[SM] %t", "Current Map", map);
+			LogAction(client, -1, "\"%L\" triggered \"currentmap\"", client);
 		}
 		else
 		{
@@ -302,6 +304,8 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 			{
 				PrintToChatAll("[SM] %t", "Next Map", map);
 			}
+
+			LogAction(client, -1, "\"%L\" triggered \"nextmap\"", client);
 		}
 		else
 		{
@@ -489,6 +493,12 @@ ShowTimeLeft(client, who)
 		|| (who == TIMELEFT_ALL_MAYBE && GetConVarInt(g_Cvar_TriggerShow)))
 	{
 		PrintToChatAll("[SM] %s", finalOutput);
+
+		if (who != TIMELEFT_ALL_ALWAYS)
+		{
+			// don't log timeleft displays that were triggered via timer
+			LogAction(client, -1, "\"%L\" triggered \"timeleft\"", client);
+		}
 	}
 	else if (client != 0 && IsClientInGame(client))
 	{
@@ -518,6 +528,7 @@ ShowFriendlyFire(client)
 		if(GetConVarInt(g_Cvar_TriggerShow))
 		{
 			PrintToChatAll("[SM] %t", phrase);
+			LogAction(client, -1, "\"%L\" triggered \"ff\"", client);
 		}
 		else
 		{
