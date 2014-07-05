@@ -1110,12 +1110,6 @@ static int command(void)
               }
             }
           } /* if */
-#if 0	/* more unused */
-        } else if (strcmp(str,"pack")==0) {
-          cell val;
-          preproc_expr(&val,NULL);      /* default = packed/unpacked */
-          sc_packstr=(int)val;
-#endif
         } else if (strcmp(str,"rational")==0) {
           char name[sNAMEMAX+1];
           cell digits=0;
@@ -1151,10 +1145,16 @@ static int command(void)
           cell val;
           preproc_expr(&val,NULL);
           sc_needsemicolon=(int)val;
-        } else if (strcmp(str, "require_newdecls")==0) {
-          cell val;
-          preproc_expr(&val,NULL);
-          sc_require_newdecls = (int)val;
+        } else if (strcmp(str, "newdecls")==0) {
+          while (*lptr<=' ' && *lptr!='\0')
+            lptr++;
+          if (strncmp((char *)lptr, "required", 8) == 0)
+            sc_require_newdecls = 1;
+          else if (strncmp((char *)lptr, "optional", 8) == 0)
+            sc_require_newdecls = 0;
+          else
+            error(146);
+          lptr=(unsigned char*)strchr((char*)lptr,'\0'); /* skip to end (ignore "extra characters on line") */
         } else if (strcmp(str,"tabsize")==0) {
           cell val;
           preproc_expr(&val,NULL);
@@ -1949,7 +1949,7 @@ char *sc_tokens[] = {
          "...", "..", "::",
          "assert",
          "*begin", "break",
-         "case", "cellsof", "chars", "class", "const", "continue",
+         "case", "cellsof", "char", "class", "const", "continue",
          "decl", "default", "defined", "delete", "do",
          "else", "*end", "enum", "exit",
          "for", "forward", "funcenum", "functag",
@@ -2319,10 +2319,6 @@ SC_FUNC int matchtoken(int token)
  */
 SC_FUNC int tokeninfo(cell *val,char **str)
 {
-  /* if the token was pushed back, tokeninfo() returns the token and
-   * parameters of the *next* token, not of the *current* token.
-   */
-  assert(sTokenBuffer->depth == 0);
   *val = current_token()->value;
   *str = current_token()->str;
   return current_token()->id;
@@ -3019,6 +3015,22 @@ SC_FUNC symbol *addvariable(const char *name,cell addr,int ident,int vclass,int 
                             int dim[],int numdim,int idxtag[])
 {
   return addvariable2(name,addr,ident,vclass,tag,dim,numdim,idxtag,0);
+}
+
+SC_FUNC symbol *addvariable3(declinfo_t *decl,cell addr,int vclass,int slength)
+{
+  typeinfo_t *type = &decl->type;
+  return addvariable2(
+    decl->name,
+    addr,
+    type->ident,
+    vclass,
+    type->tag,
+    type->dim,
+    type->numdim,
+    type->idxtag,
+    slength
+  );
 }
 
 SC_FUNC symbol *addvariable2(const char *name,cell addr,int ident,int vclass,int tag,
