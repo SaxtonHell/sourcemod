@@ -237,6 +237,8 @@ public Action Command_Nominate(int client, int args)
 	char name[64];
 	GetClientName(client, name, sizeof(name));
 	PrintToChatAll("[SM] %t", "Map Nominated", name, mapname);
+
+	LogAction(client, -1, "\"%L\" nominated map \"%s\"", client, mapname);
 	
 	return Plugin_Continue;
 }
@@ -336,10 +338,14 @@ public int Handler_MapSelectMenu(Menu menu, MenuAction action, int param1, int p
 			if (result == Nominate_Replaced)
 			{
 				PrintToChatAll("[SM] %t", "Map Nomination Changed", name, map);
+
+				LogAction(param1, -1, "\"%L\" changed nominated map to \"%s\"", param1, map);
 				return 0;	
 			}
 			
 			PrintToChatAll("[SM] %t", "Map Nominated", name, map);
+
+			LogAction(param1, -1, "\"%L\" nominated map \"%s\"", param1, map);
 		}
 		
 		case MenuAction_DrawItem:
