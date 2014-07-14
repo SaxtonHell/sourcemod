@@ -65,6 +65,8 @@ namespace SourcePawn
 	};
 }
 
+extern void LogFatalPCodeError(const char *fmt, ...);
+
 extern SourcePawn::SourcePawnEngine2 g_engine2;
 
 class EnterProfileScope
