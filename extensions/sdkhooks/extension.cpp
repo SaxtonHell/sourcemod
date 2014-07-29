@@ -470,6 +470,11 @@ cell_t SDKHooks::Call(CBaseEntity *pEnt, SDKHookType type, CBaseEntity *pOther)
 {
 	cell_t ret = Pl_Continue;
 
+	if (pEnt == NULL)
+	{
+		return ret;
+	}
+
 	CVTableHook vhook(pEnt);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[type];
 	for (size_t entry = 0; entry < vtablehooklist.length(); ++entry)
@@ -909,6 +914,11 @@ void SDKHooks::Hook_EndTouchPost(CBaseEntity *pOther)
 void SDKHooks::Hook_FireBulletsPost(const FireBulletsInfo_t &info)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		return;
+	}
+
 	int entity = gamehelpers->EntityToBCompatRef(pEntity);
 
 	IGamePlayer *pPlayer = playerhelpers->GetGamePlayer(entity);
@@ -952,6 +962,11 @@ void SDKHooks::Hook_FireBulletsPost(const FireBulletsInfo_t &info)
 int SDKHooks::Hook_GetMaxHealth()
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, 0);
+	}
+
 	int original_max = SH_MCALL(pEntity, GetMaxHealth)();
 
 	CVTableHook vhook(pEntity);
@@ -998,6 +1013,10 @@ void SDKHooks::Hook_GroundEntChangedPost(void *pVar)
 int SDKHooks::Hook_OnTakeDamage(CTakeDamageInfoHack &info)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, 0);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_OnTakeDamage];
@@ -1090,6 +1109,10 @@ int SDKHooks::Hook_OnTakeDamage(CTakeDamageInfoHack &info)
 int SDKHooks::Hook_OnTakeDamagePost(CTakeDamageInfoHack &info)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, 0);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_OnTakeDamagePost];
@@ -1159,6 +1182,10 @@ void SDKHooks::Hook_PostThinkPost()
 bool SDKHooks::Hook_Reload()
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, true);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_Reload];
@@ -1194,6 +1221,10 @@ bool SDKHooks::Hook_Reload()
 bool SDKHooks::Hook_ReloadPost()
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, true);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_ReloadPost];
@@ -1237,6 +1268,10 @@ void SDKHooks::Hook_SetTransmit(CCheckTransmitInfo *pInfo, bool bAlways)
 bool SDKHooks::Hook_ShouldCollide(int collisionGroup, int contentsMask)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META_VALUE(MRES_IGNORED, true);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_ShouldCollide];
@@ -1283,6 +1318,10 @@ void SDKHooks::Hook_Spawn()
 #endif
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META(MRES_IGNORED);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_Spawn];
@@ -1373,6 +1412,10 @@ void SDKHooks::Hook_TraceAttack(CTakeDamageInfoHack &info, const Vector &vecDir,
 #endif
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META(MRES_IGNORED);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_TraceAttack];
@@ -1454,6 +1497,10 @@ void SDKHooks::Hook_TraceAttackPost(CTakeDamageInfoHack &info, const Vector &vec
 #endif
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META(MRES_IGNORED);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_TraceAttackPost];
@@ -1492,6 +1539,10 @@ void SDKHooks::Hook_TraceAttackPost(CTakeDamageInfoHack &info, const Vector &vec
 void SDKHooks::Hook_Use(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META(MRES_IGNORED);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_Use];
@@ -1533,6 +1584,10 @@ void SDKHooks::Hook_Use(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 void SDKHooks::Hook_UsePost(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value)
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
+	if (pEntity == NULL)
+	{
+		RETURN_META(MRES_IGNORED);
+	}
 
 	CVTableHook vhook(pEntity);
 	ke::Vector<CVTableList *> &vtablehooklist = g_HookList[SDKHook_UsePost];
