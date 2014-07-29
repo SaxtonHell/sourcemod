@@ -438,6 +438,24 @@ FeatureStatus SDKHooks::GetFeatureStatus(FeatureType type, const char *name)
 /**
  * Functions
  */
+
+void CopyCallbackList(const ke::Vector<HookList> &hookLists, ke::Vector<IPluginFunction *> &callbacks, int entity)
+{
+	// we know that worse case we'll need one callback for each hooklist
+	// so lets get the reallocations out of the way first
+	callbacks.ensure(hookLists.length());
+
+	for (size_t entry = 0; entry < hookLists.length(); ++entry)
+	{
+		if (hookLists[entry].entity != entity)
+		{
+			continue;
+		}
+
+		callbacks.append(hookLists[entry].callback);
+	}
+}
+
 cell_t SDKHooks::Call(int entity, SDKHookType type, int other)
 {
 	return Call(gamehelpers->ReferenceToEntity(entity), type, gamehelpers->ReferenceToEntity(other));
@@ -461,17 +479,15 @@ cell_t SDKHooks::Call(CBaseEntity *pEnt, SDKHookType type, CBaseEntity *pOther)
 			continue;
 		}
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
 		int entity = gamehelpers->EntityToBCompatRef(pEnt);
 		int other = gamehelpers->EntityToBCompatRef(pOther);
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(other);
 
@@ -914,15 +930,12 @@ void SDKHooks::Hook_FireBulletsPost(const FireBulletsInfo_t &info)
 
 		const char *weapon = pInfo->GetWeaponName();
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(info.m_iShots);
 			callback->PushString(weapon?weapon:"");
@@ -956,15 +969,12 @@ int SDKHooks::Hook_GetMaxHealth()
 
 		cell_t res = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCellByRef(&new_max);
 			callback->Execute(&res);
@@ -1013,15 +1023,12 @@ int SDKHooks::Hook_OnTakeDamage(CTakeDamageInfoHack &info)
 
 		cell_t res, ret = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCellByRef(&attacker);
 			callback->PushCellByRef(&inflictor);
@@ -1095,15 +1102,12 @@ int SDKHooks::Hook_OnTakeDamagePost(CTakeDamageInfoHack &info)
 
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(info.GetAttacker());
 			callback->PushCell(info.GetInflictor());
@@ -1168,15 +1172,12 @@ bool SDKHooks::Hook_Reload()
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 		cell_t res = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->Execute(&res);
 		}
@@ -1206,15 +1207,12 @@ bool SDKHooks::Hook_ReloadPost()
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 		cell_t origreturn = META_RESULT_ORIG_RET(bool) ? 1 : 0;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(origreturn);
 			callback->Execute(NULL);
@@ -1253,15 +1251,12 @@ bool SDKHooks::Hook_ShouldCollide(int collisionGroup, int contentsMask)
 		cell_t origRet = ((META_RESULT_STATUS >= MRES_OVERRIDE)?(META_RESULT_OVERRIDE_RET(bool)):(META_RESULT_ORIG_RET(bool))) ? 1 : 0;
 		cell_t res = 0;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(collisionGroup);
 			callback->PushCell(contentsMask);
@@ -1301,15 +1296,12 @@ void SDKHooks::Hook_Spawn()
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 		cell_t res = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->Execute(&res);
 		}
@@ -1399,15 +1391,12 @@ void SDKHooks::Hook_TraceAttack(CTakeDamageInfoHack &info, const Vector &vecDir,
 		int ammotype = info.GetAmmoType();
 		cell_t res, ret = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCellByRef(&attacker);
 			callback->PushCellByRef(&inflictor);
@@ -1477,15 +1466,12 @@ void SDKHooks::Hook_TraceAttackPost(CTakeDamageInfoHack &info, const Vector &vec
 
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(info.GetAttacker());
 			callback->PushCell(info.GetInflictor());
@@ -1521,15 +1507,12 @@ void SDKHooks::Hook_Use(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 		int caller = gamehelpers->EntityToBCompatRef(pCaller);
 		cell_t ret = Pl_Continue;
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(activator);
 			callback->PushCell(caller);
@@ -1564,15 +1547,12 @@ void SDKHooks::Hook_UsePost(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 		int activator = gamehelpers->EntityToBCompatRef(pActivator);
 		int caller = gamehelpers->EntityToBCompatRef(pCaller);
 
-		ke::Vector<HookList> &pawnlist = vtablehooklist[entry]->hooks;
-		for (entry = 0; entry < pawnlist.length(); ++entry)
-		{
-			if (entity != pawnlist[entry].entity)
-			{
-				continue;
-			}
+		ke::Vector<IPluginFunction *> callbackList;
+		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
-			IPluginFunction *callback = pawnlist[entry].callback;
+		for (entry = 0; entry < callbackList.length(); ++entry)
+		{
+			IPluginFunction *callback = callbackList[entry];
 			callback->PushCell(entity);
 			callback->PushCell(activator);
 			callback->PushCell(caller);
