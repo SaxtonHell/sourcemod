@@ -356,7 +356,7 @@ void UpdateReader::PerformUpdate(const char *url)
 	xfer = webternet->CreateSession();
 	xfer->SetFailOnHTTPError(true);
 
-	form->AddString("version", SOURCEMOD_VERSION);
+	form->AddString("version", SOURCEMOD_UPDATER_VERSION);
 
 	unsigned int num_files = 0;
 	add_folders(form, "gamedata", num_files);
