@@ -192,7 +192,7 @@ public OnPluginStart()
 	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
 	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
 	g_MapVoteItemSelectedForward = CreateGlobalForward("OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
-	g_MapVoteItemDisplayedForward = CreateGlobalForward("OnMapVoteItemDisplayed", ET_Hook, Param_Cell, Param_String, Param_Cell);
+	g_MapVoteItemDisplayedForward = CreateGlobalForward("OnMapVoteItemDisplayed", ET_Hook, Param_Cell, Param_String, Param_String, Param_Cell);
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -898,6 +898,7 @@ public Handler_MapVoteMenu(Handle:menu, MenuAction:action, param1, param2)
 
 			Call_StartForward(g_MapVoteItemDisplayedForward);
 			Call_PushCell(param1);
+			Call_PushString(map);
 			Call_PushStringEx(displayBuffer, sizeof(displayBuffer), SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 			Call_PushCell(sizeof(displayBuffer));
 
