@@ -174,6 +174,38 @@ public:
 	{
 		return filesystem->Size(pFileName, pPathID);
 	}
+	int Read(void* pOutput, int size, FileHandle_t file)
+	{
+		return filesystem->Read(pOutput, size, file);
+	}
+	int Write(void const* pInput, int size, FileHandle_t file)
+	{
+		return filesystem->Write(pInput, size, file);
+	}
+	void Seek(FileHandle_t file, int pos, int seekType)
+	{
+		filesystem->Seek(file, pos, (FileSystemSeek_t) seekType);
+	}
+	unsigned int Tell(FileHandle_t file)
+	{
+		return filesystem->Tell(file);
+	}
+	int FPrint(FileHandle_t file, const char *pData)
+	{
+		return filesystem->FPrintf(file, "%s", pData);
+	}
+	void Flush(FileHandle_t file)
+	{
+		filesystem->Flush(file);
+	}
+	bool IsOk(FileHandle_t file)
+	{
+		return filesystem->IsOk(file);
+	}
+	void RemoveFile(const char *pRelativePath, const char *pathID)
+	{
+		filesystem->RemoveFile(pRelativePath, pathID);
+	}
 };
 
 static VFileSystem_Logic logic_filesystem;
