@@ -453,6 +453,13 @@ static cell_t sm_SetConVarString(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("Invalid convar handle %x (error %d)", hndl, err);
 	}
 
+	const char *convarName = pConVar->GetName();
+	if (strcasecmp(convarName, "sv_tags") == 0)
+	{
+		/* Hardening: don't allow plugins to modify the value of sv_tags */
+		return 1;
+	}
+
 	char *value;
 	pContext->LocalToString(params[2], &value);
 
