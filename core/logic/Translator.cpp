@@ -40,6 +40,7 @@
 #include <ILibrarySys.h>
 #include "PhraseCollection.h"
 #include "stringutil.h"
+#include "ProfileTools.h"
 
 Translator g_Translator;
 IPhraseCollection *g_pCorePhrases = NULL;
@@ -997,6 +998,8 @@ int Translator::GetGlobalTarget() const
 bool CoreTranslate(char *buffer,  size_t maxlength, const char *format, unsigned int numparams,
                    size_t *pOutLength, ...)
 {
+	SM_PROFILE("CoreTranslate");
+
 	va_list ap;
 	unsigned int i;
 	const char *fail_phrase;

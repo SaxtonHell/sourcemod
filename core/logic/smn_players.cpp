@@ -39,6 +39,7 @@
 #include <sh_list.h>
 #include "CellArray.h"
 #include "AutoHandleRooter.h"
+#include "ProfileTools.h"
 
 using namespace SourceHook;
 using namespace SourceMod;
@@ -110,6 +111,8 @@ public:
 public: //ICommandTargetProcessor
 	bool ProcessCommandTarget(cmd_target_info_t *info)
 	{
+		SM_PROFILE("PlayerLogicHelpers::ProcessCommandTarget");
+
 		List<SimpleMultiTargetFilter *>::iterator iter;
 
 		for (iter = simpleMultis.begin(); iter != simpleMultis.end(); iter++) {
@@ -1395,6 +1398,8 @@ static cell_t IsClientInKickQueue(IPluginContext *pContext, const cell_t *params
 
 static cell_t ProcessTargetString(IPluginContext *pContext, const cell_t *params)
 {
+	SM_PROFILE("ProcessTargetString");
+
 	cmd_target_info_t info;
 
 	pContext->LocalToString(params[1], (char **) &info.pattern);

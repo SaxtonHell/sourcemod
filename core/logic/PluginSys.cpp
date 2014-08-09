@@ -42,6 +42,7 @@
 #include "GameConfigs.h"
 #include "common_logic.h"
 #include "Translator.h"
+#include "ProfileTools.h"
 
 CPluginManager g_PluginSys;
 HandleType_t g_PluginType = 0;
@@ -2515,6 +2516,8 @@ void CPluginManager::OnLibraryAction(const char *lib, LibraryAction action)
 
 bool CPluginManager::LibraryExists(const char *lib)
 {
+	SM_PROFILE("CPluginManager::LibraryExists");
+
 	List<CPlugin *>::iterator iter;
 
 	for (iter=m_plugins.begin();

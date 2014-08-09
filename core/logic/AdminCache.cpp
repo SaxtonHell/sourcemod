@@ -39,6 +39,7 @@
 #include "AdminCache.h"
 #include "Translator.h"
 #include "common_logic.h"
+#include "ProfileTools.h"
 
 #define LEVEL_STATE_NONE		0
 #define LEVEL_STATE_LEVELS		1
@@ -332,6 +333,8 @@ void AdminCache::AddCommandOverride(const char *cmd, OverrideType type, FlagBits
 
 bool AdminCache::GetCommandOverride(const char *cmd, OverrideType type, FlagBits *pFlags)
 {
+	SM_PROFILE("AdminCache::GetCommandOverride");
+
 	FlagMap *map;
 	if (type == Override_Command)
 		map = &m_CmdOverrides;
@@ -480,6 +483,8 @@ GroupId AdminCache::AddGroup(const char *group_name)
 
 GroupId AdminCache::FindGroupByName(const char *group_name)
 {
+	SM_PROFILE("AdminCache::FindGroupByName");
+
 	GroupId id;
 	if (!m_Groups.retrieve(group_name, &id))
 		return INVALID_GROUP_ID;
@@ -813,6 +818,8 @@ bool AdminCache::InvalidateAdmin(AdminId id)
 
 void AdminCache::InvalidateGroup(GroupId id)
 {
+	SM_PROFILE("AdminCache::InvalidateGroup");
+
 	AdminGroup *pGroup = (AdminGroup *)m_pMemory->GetAddress(id);
 	AdminGroup *pOther;
 
@@ -945,6 +952,8 @@ void AdminCache::RegisterAuthIdentType(const char *name)
 
 void AdminCache::InvalidateAdminCache(bool unlink_admins)
 {
+	SM_PROFILE("AdminCache::InvalidateAdminCache");
+
 	m_InvalidatingAdmins = true;
 	if (!m_destroying)
 	{
@@ -979,6 +988,8 @@ void AdminCache::InvalidateAdminCache(bool unlink_admins)
 
 void AdminCache::DumpAdminCache(AdminCachePart part, bool rebuild)
 {
+	SM_PROFILE("AdminCache::DumpAdminCache");
+
 	List<IAdminListener *>::iterator iter;
 	IAdminListener *pListener;
 	cell_t result;
@@ -1040,6 +1051,8 @@ const char *AdminCache::GetAdminName(AdminId id)
 
 bool AdminCache::GetMethodIndex(const char *name, unsigned int *_index)
 {
+	SM_PROFILE("AdminCache::GetMethodIndex");
+
 	List<AuthMethod *>::iterator iter;
 	unsigned int index = 0;
 	for (iter=m_AuthMethods.begin();
@@ -1093,6 +1106,8 @@ bool AdminCache::BindAdminIdentity(AdminId id, const char *auth, const char *ide
 
 AdminId AdminCache::FindAdminByIdentity(const char *auth, const char *identity)
 {
+	SM_PROFILE("AdminCache::FindAdminByIdentity");
+
 	AuthMethod *method;
 	if (!m_AuthTables.retrieve(auth, &method))
 		return INVALID_ADMIN_ID;
@@ -1408,6 +1423,8 @@ bool AdminCache::CheckAdminFlags(AdminId id, FlagBits bits)
 
 bool AdminCache::CanAdminTarget(AdminId id, AdminId target)
 {
+	SM_PROFILE("AdminCache::CanAdminTarget");
+
 	/** 
 	 * Zeroth, if the targeting AdminId is INVALID_ADMIN_ID, targeting fails.
 	 * First, if the targeted AdminId is INVALID_ADMIN_ID, targeting succeeds.
@@ -1581,6 +1598,8 @@ unsigned int AdminCache::GetAdminSerialChange(AdminId id)
 
 bool AdminCache::CanAdminUseCommand(int client, const char *cmd)
 {
+	SM_PROFILE("AdminCache::CanAdminUseCommand");
+
 	FlagBits bits;
 	OverrideType otype = Override_Command;
 
@@ -1655,6 +1674,8 @@ unsigned int AdminCache::GetAdminImmunityLevel(AdminId id)
 
 bool AdminCache::CheckAccess(int client, const char *cmd, FlagBits flags, bool override_only)
 {
+	SM_PROFILE("AdminCache::CheckAccess");
+
 	if (client == 0)
 	{
 		return true;
@@ -1871,6 +1892,8 @@ AdminUser *AdminCache::GetUser(AdminId aid)
 
 const char *AdminCache::GetMethodName(unsigned int index)
 {
+	SM_PROFILE("AdminCache::GetMethodName");
+
 	List<AuthMethod *>::iterator iter;
 	for (iter=m_AuthMethods.begin();
 		iter!=m_AuthMethods.end();
@@ -1913,6 +1936,8 @@ size_t AdminCache::FillFlagString(FlagBits bits, char *buffer, size_t maxlen)
 
 bool AdminCache::CheckClientCommandAccess(int client, const char *cmd, FlagBits cmdflags)
 {
+	SM_PROFILE("AdminCache::CheckClientCommandAccess");
+
 	if (cmdflags == 0 || client == 0)
 	{
 		return true;
@@ -1937,6 +1962,8 @@ bool AdminCache::CheckClientCommandAccess(int client, const char *cmd, FlagBits 
 
 bool AdminCache::CheckAdminCommandAccess(AdminId adm, const char *cmd, FlagBits cmdflags)
 {
+	SM_PROFILE("AdminCache::CheckAdminCommandAccess");
+
 	if (adm != INVALID_ADMIN_ID)
 	{
 		FlagBits bits = GetAdminFlags(adm, Access_Effective);
