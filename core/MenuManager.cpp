@@ -40,6 +40,7 @@
 #include "MenuStyle_Valve.h"
 #include "sourcemm_api.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 
 MenuManager g_Menus;
 VoteMenuHandler s_VoteHandler;
@@ -211,6 +212,8 @@ inline bool IsSlotItem(IMenuPanel *display,
 
 IMenuPanel *MenuManager::RenderMenu(int client, menu_states_t &md, ItemOrder order)
 {
+	SM_PROFILE("MenuManager::RenderMenu");
+
 	IBaseMenu *menu = md.menu;
 
 	if (!menu)

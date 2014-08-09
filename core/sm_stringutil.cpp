@@ -37,6 +37,7 @@
 #include "Logger.h"
 #include "PlayerManager.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include "sourcemod.h"
 #include <am-utility.h>
 
@@ -71,6 +72,8 @@ size_t Translate(char *buffer,
 				 int *arg,
 				 bool *error)
 {
+	SM_PROFILE("Translate");
+
 	unsigned int langid;
 	*error = false;
 	Translation pTrans;
@@ -761,6 +764,8 @@ reswitch:
 		case 'T':
 		case 't':
 			{
+				SM_PROFILE("gnprintf Translation");
+
 				int target;
 				const char *key;
 				size_t out_length;

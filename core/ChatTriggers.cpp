@@ -36,6 +36,7 @@
 #include "PlayerManager.h"
 #include "HalfLife2.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include "sourcemod.h"
 
 #if SOURCE_ENGINE == SE_DOTA
@@ -206,6 +207,9 @@ void ChatTriggers::OnSayCommand_Pre()
 {
 	CCommand command;
 #endif
+
+	SM_PROFILE("ChatTriggers::OnSayCommand_Pre");
+
 	int client = g_ConCmds.GetCommandClient();
 	m_bIsChatTrigger = false;
 	m_bWasFloodedMessage = false;
@@ -400,6 +404,8 @@ void ChatTriggers::OnSayCommand_Post()
 
 bool ChatTriggers::PreProcessTrigger(edict_t *pEdict, const char *args)
 {
+	SM_PROFILE("ChatTriggers::PreProcessTrigger");
+
 	/* Extract a command.  This is kind of sloppy. */
 	char cmd_buf[64];
 	size_t cmd_len = 0;

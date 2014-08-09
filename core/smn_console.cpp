@@ -45,6 +45,7 @@
 #include "ConsoleDetours.h"
 #include "ConCommandBaseIterator.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include <sm_namehashset.h>
 
 #if SOURCE_ENGINE == SE_CSGO || SOURCE_ENGINE == SE_DOTA
@@ -993,6 +994,8 @@ static cell_t GetCommandIterator(IPluginContext *pContext, const cell_t *params)
 
 static cell_t ReadCommandIterator(IPluginContext *pContext, const cell_t *params)
 {
+	SM_PROFILE("ReadCommandIterator");
+
 	GlobCmdIter *iter;
 	HandleError err;
 	HandleSecurity sec(pContext->GetIdentity(), g_pCoreIdent);
