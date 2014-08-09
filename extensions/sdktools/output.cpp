@@ -99,6 +99,8 @@ bool EntityOutputManager::CreateFireEventDetour()
 
 void EntityOutputManager::FireEventDetour(void *pOutput, CBaseEntity *pActivator, CBaseEntity *pCaller, float fDelay)
 {
+	SM_PROFILE("EntityOutputManager::FireEventDetour");
+
 	if (!pCaller)
 	{
 		return;

@@ -132,6 +132,8 @@ void CHookManager::OnClientPutInServer(int client)
 
 void CHookManager::PlayerRunCmd(CUserCmd *ucmd, IMoveHelper *moveHelper)
 {
+	SM_PROFILE("CHookManager::PlayerRunCmd");
+
 	if (m_usercmdsFwd->GetFunctionCount() == 0)
 	{
 		RETURN_META(MRES_IGNORED);

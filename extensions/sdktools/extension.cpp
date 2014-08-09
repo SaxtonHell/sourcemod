@@ -366,6 +366,8 @@ bool SDKTools::LevelInit(char const *pMapName, char const *pMapEntities, char co
 
 bool SDKTools::ProcessCommandTarget(cmd_target_info_t *info)
 {
+	SM_PROFILE("SDKTools::ProcessCommandTarget");
+
 	IGamePlayer *pAdmin = info->admin ? playerhelpers->GetGamePlayer(info->admin) : NULL;
 
 	if (strcmp(info->pattern, "@aim") == 0)

@@ -206,6 +206,8 @@ bool TempEntHooks::RemoveHook(const char *name, IPluginFunction *pFunc)
 
 void TempEntHooks::OnPlaybackTempEntity(IRecipientFilter &filter, float delay, const void *pSender, const SendTable *pST, int classID)
 {
+	SM_PROFILE("TempEntHooks::OnPlaybackTempEntity");
+
 	TEHookInfo *pInfo;
 	const char *name = g_TEManager.GetNameFromThisPtr(const_cast<void *>(pSender));
 

@@ -40,6 +40,8 @@ static cell_t LockStringTables(IPluginContext *pContext, const cell_t *params)
 
 static cell_t FindStringTable(IPluginContext *pContext, const cell_t *params)
 {
+	SM_PROFILE("FindStringTable");
+
 	char *name;
 	pContext->LocalToString(params[1], &name);
 
@@ -102,6 +104,8 @@ static cell_t GetStringTableName(IPluginContext *pContext, const cell_t *params)
 
 static cell_t FindStringIndex(IPluginContext *pContext, const cell_t *params)
 {
+	SM_PROFILE("FindStringIndex");
+
 	TABLEID idx = static_cast<TABLEID>(params[1]);
 	INetworkStringTable *pTable = netstringtables->GetTable(idx);
 	char *str;
