@@ -474,8 +474,6 @@ HandleError HandleSystem::GetHandle(Handle_t handle,
 									unsigned int *in_index,
 									bool ignoreFree)
 {
-	SM_PROFILE("HandleSystem::GetHandle");
-
 	unsigned int serial = (handle >> 16);
 	unsigned int index = (handle & HANDLESYS_HANDLE_MASK);
 
@@ -509,8 +507,6 @@ HandleError HandleSystem::GetHandle(Handle_t handle,
 
 bool HandleSystem::CheckAccess(QHandle *pHandle, HandleAccessRight right, const HandleSecurity *pSecurity)
 {
-	SM_PROFILE("HandleSystem::CheckAccess");
-
 	QHandleType *pType = &m_Types[pHandle->type];
 	unsigned int access;
 
@@ -737,8 +733,6 @@ HandleError HandleSystem::FreeHandle(Handle_t handle, const HandleSecurity *pSec
 
 HandleError HandleSystem::ReadHandle(Handle_t handle, HandleType_t type, const HandleSecurity *pSecurity, void **object)
 {
-	SM_PROFILE("HandleSystem::ReadHandle");
-
 	unsigned int index;
 	QHandle *pHandle;
 	HandleError err;
