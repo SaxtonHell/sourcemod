@@ -34,6 +34,7 @@
 #include <sh_vector.h>
 #include <sm_namehashset.h>
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 
 ConVarManager g_ConVarManager;
 
@@ -496,6 +497,8 @@ Handle_t ConVarManager::CreateConVar(IPluginContext *pContext, const char *name,
 
 Handle_t ConVarManager::FindConVar(const char *name)
 {
+	SM_PROFILE("ConVarManager::FindConVar");
+
 	ConVar *pConVar = NULL;
 	ConVarInfo *pInfo;
 	Handle_t hndl;

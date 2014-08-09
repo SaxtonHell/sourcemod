@@ -340,6 +340,8 @@ struct sm_logic_t
 	void			(*DumpHandles)(void (*dumpfn)(const char *fmt, ...));
 	void			(*DumpAdminCache)(FILE *);
 	void            (*RegisterProfiler)(IProfilingTool *tool);
+	void			(*EnterProfileScope)(const char *group, const char *name);
+	void			(*LeaveProfileScope)();
 	IScriptManager	*scripts;
 	IShareSys		*sharesys;
 	IExtensionSys	*extsys;

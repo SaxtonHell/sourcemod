@@ -37,6 +37,7 @@
 #include "CoreConfig.h"
 #include <sm_queue.h>
 #include <IThreader.h>
+#include "sm_profiletool.h"
 #include "sourcemod.h"
 
 static IMutex *frame_mutex;
@@ -73,9 +74,13 @@ void AddFrameAction(const FrameAction & action)
 
 void RunFrameHooks(bool simulating)
 {
+	SM_PROFILE("RunFrameHooks");
+
 	/* It's okay if this check races. */
 	if (frame_queue->size())
 	{
+		SM_PROFILE("Run Frame Actions");
+
 		Queue<FrameAction> *temp;
 
 		/* Very quick lock to move queue/actions back and forth */

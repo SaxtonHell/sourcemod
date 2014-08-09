@@ -36,6 +36,7 @@
 #include "HalfLife2.h"
 #include "ChatTriggers.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 
 using namespace ke;
 
@@ -189,6 +190,8 @@ ConCmdList::iterator ConCmdManager::FindInList(const char *cmd)
 
 ResultType ConCmdManager::DispatchClientCommand(int client, const char *cmd, int args, ResultType type)
 {
+	SM_PROFILE("ConCmdManager::DispatchClientCommand");
+
 	ConCmdInfo *pInfo;
 
 	if ((pInfo = FindInTrie(cmd)) == NULL)
@@ -232,6 +235,8 @@ ResultType ConCmdManager::DispatchClientCommand(int client, const char *cmd, int
 
 void ConCmdManager::InternalDispatch(const CCommand &command)
 {
+	SM_PROFILE("ConCmdManager::InternalDispatch");
+
 	int client = m_CmdClient;
 
 	if (client)
@@ -331,6 +336,8 @@ void ConCmdManager::InternalDispatch(const CCommand &command)
 
 bool ConCmdManager::CheckAccess(int client, const char *cmd, AdminCmdInfo *pAdmin)
 {
+	SM_PROFILE("ConCmdManager::CheckAccess");
+
 	if (adminsys->CheckClientCommandAccess(client, cmd, pAdmin->eflags))
 	{
 		return true;
@@ -574,6 +581,8 @@ void ConCmdManager::RemoveConCmd(ConCmdInfo *info, const char *name, bool is_rea
 
 bool ConCmdManager::LookForSourceModCommand(const char *cmd)
 {
+	SM_PROFILE("ConCmdManager::LookForSourceModCommand");
+
 	ConCmdInfo *pInfo;
 	if (!m_Cmds.retrieve(cmd, &pInfo))
 		return false;
@@ -583,6 +592,8 @@ bool ConCmdManager::LookForSourceModCommand(const char *cmd)
 
 bool ConCmdManager::LookForCommandAdminFlags(const char *cmd, FlagBits *pFlags)
 {
+	SM_PROFILE("ConCmdManager::LookForCommandAdminFlags");
+
 	ConCmdInfo *pInfo;
 	if (!m_Cmds.retrieve(cmd, &pInfo))
 		return false;

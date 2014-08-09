@@ -42,6 +42,7 @@
 #endif
 #include "ChatTriggers.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include "sourcemod.h"
 
 #if defined CreateMenu
@@ -426,6 +427,8 @@ cell_t CMenuHandler::DoAction(IBaseMenu *menu, MenuAction action, cell_t param1,
 
 void CMenuHandler::OnMenuVoteResults(IBaseMenu *menu, const menu_vote_result_t *results)
 {
+	SM_PROFILE("CMenuHandler::OnMenuVoteResults");
+
 	if (!m_pVoteResults)
 	{
 		/* Call MenuAction_VoteEnd instead.  See if there are any extra winners. */

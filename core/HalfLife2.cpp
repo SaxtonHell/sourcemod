@@ -40,6 +40,7 @@
 #include <Logger.h>
 #include "LibrarySys.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include <tier0/mem.h>
 
 #if SOURCE_ENGINE == SE_DOTA
@@ -286,6 +287,8 @@ bool UTIL_FindInSendTable(SendTable *pTable,
 						  sm_sendprop_info_t *info,
 						  unsigned int offset)
 {
+	SM_PROFILE("UTIL_FindInSendTable");
+
 	const char *pname;
 	int props = pTable->GetNumProps();
 	SendProp *prop;
@@ -318,6 +321,8 @@ bool UTIL_FindInSendTable(SendTable *pTable,
 
 bool UTIL_FindDataMapInfo(datamap_t *pMap, const char *name, sm_datatable_info_t *pDataTable)
 {
+	SM_PROFILE("UTIL_FindDataMapInfo");
+
 	while (pMap)
 	{
 		for (int i = 0; i < pMap->dataNumFields; ++i)
@@ -359,6 +364,8 @@ ServerClass *CHalfLife2::FindServerClass(const char *classname)
 
 DataTableInfo *CHalfLife2::_FindServerClass(const char *classname)
 {
+	SM_PROFILE("CHalfLife2::_FindServerClass");
+
 	DataTableInfo *pInfo = NULL;
 	if (!m_Classes.retrieve(classname, &pInfo))
 	{
@@ -382,6 +389,8 @@ DataTableInfo *CHalfLife2::_FindServerClass(const char *classname)
 
 bool CHalfLife2::FindSendPropInfo(const char *classname, const char *offset, sm_sendprop_info_t *info)
 {
+	SM_PROFILE("CHalfLife2::FindSendPropInfo");
+
 	DataTableInfo *pInfo;
 
 	if ((pInfo = _FindServerClass(classname)) == NULL)
@@ -431,6 +440,8 @@ typedescription_t *CHalfLife2::FindInDataMap(datamap_t *pMap, const char *offset
 
 bool CHalfLife2::FindDataMapInfo(datamap_t *pMap, const char *offset, sm_datatable_info_t *pDataTable)
 {
+	SM_PROFILE("CHalfLife2::FindDataMapInfo");
+
 	DataTableMap::Insert i = m_Maps.findForAdd(pMap);
 	if (!i.found())
 		m_Maps.add(i, pMap, new DataMapCache());
@@ -736,6 +747,8 @@ void CHalfLife2::AddToFakeCliCmdQueue(int client, int userid, const char *cmd)
 
 void CHalfLife2::ProcessFakeCliCmdQueue()
 {
+	SM_PROFILE("CHalfLife2::ProcessFakeCliCmdQueue");
+
 	while (!m_CmdQueue.empty())
 	{
 		DelayedFakeCliCmd *pFake = m_CmdQueue.first();
@@ -769,6 +782,8 @@ bool CHalfLife2::IsLANServer()
 
 bool CHalfLife2::KVLoadFromFile(KeyValues *kv, IBaseFileSystem *filesystem, const char *resourceName, const char *pathID)
 {
+	SM_PROFILE("CHalfLife2::KVLoadFromFile");
+
 #if defined METAMOD_PLAPI_VERSION || PLAPI_VERSION >= 11
 	if (g_SMAPI->GetSourceEngineBuild() == SOURCE_ENGINE_ORIGINAL)
 #else
@@ -865,6 +880,8 @@ void CHalfLife2::AddDelayedKick(int client, int userid, const char *msg)
 
 void CHalfLife2::ProcessDelayedKicks()
 {
+	SM_PROFILE("CHalfLife2::ProcessDelayedKicks");
+
 	while (!m_DelayedKicks.empty())
 	{
 		DelayedKickInfo info = m_DelayedKicks.first();

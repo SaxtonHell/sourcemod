@@ -45,6 +45,7 @@
 #include <IGameConfigs.h>
 #include "ConsoleDetours.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 #include <sourcemod_version.h>
 
 PlayerManager g_Players;
@@ -397,6 +398,8 @@ bool PlayerManager::CheckSetAdminName(int index, CPlayer *pPlayer, AdminId id)
 
 void PlayerManager::RunAuthChecks()
 {
+	SM_PROFILE("PlayerManager::RunAuthChecks");
+
 	CPlayer *pPlayer;
 	const char *authstr;
 	unsigned int removed = 0;
@@ -494,6 +497,9 @@ bool PlayerManager::OnClientConnect(edict_t *pEntity, const char *pszName, const
 {
 	int client = IndexOfEdict(pEntity);
 #endif
+
+	SM_PROFILE("PlayerManager::OnClientConnect");
+
 	CPlayer *pPlayer = &m_Players[client];
 	++m_PlayersSinceActive;
 
@@ -561,6 +567,8 @@ bool PlayerManager::OnClientConnect_Post(edict_t *pEntity, const char *pszName, 
 	int client = IndexOfEdict(pEntity);
 #endif
 
+	SM_PROFILE("PlayerManager::OnClientConnect_Post");
+
 	bool orig_value = META_RESULT_ORIG_RET(bool);
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -605,6 +613,8 @@ void PlayerManager::OnClientPutInServer(CEntityIndex index, const char *playerna
 #else
 void PlayerManager::OnClientPutInServer(edict_t *pEntity, const char *playername)
 {
+	SM_PROFILE("PlayerManager::OnClientPutInServer");
+
 	int client = IndexOfEdict(pEntity);
 #endif
 
@@ -813,6 +823,8 @@ void PlayerManager::OnClientDisconnect(edict_t *pEntity)
 	int client = IndexOfEdict(pEntity);
 #endif
 
+	SM_PROFILE("PlayerManager::OnClientDisconnect");
+
 	cell_t res;
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -851,6 +863,9 @@ void PlayerManager::OnClientDisconnect_Post(edict_t *pEntity)
 {
 	int client = IndexOfEdict(pEntity);
 #endif
+
+	SM_PROFILE("PlayerManager::OnClientDisconnect_Post");
+
 	CPlayer *pPlayer = &m_Players[client];
 	if (!pPlayer->IsConnected())
 	{
@@ -923,6 +938,8 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 	int client = IndexOfEdict(pEntity);
 #endif
 	
+	SM_PROFILE("PlayerManager::OnClientCommand");
+
 	cell_t res = Pl_Continue;
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -1136,6 +1153,8 @@ int PlayerManager::GetNumPlayers()
 
 int PlayerManager::GetClientOfUserId(int userid)
 {
+	SM_PROFILE("PlayerManager::GetClientOfUserId");
+
 	if (userid < 0 || userid > USHRT_MAX)
 	{
 		return 0;
@@ -1324,6 +1343,8 @@ int PlayerManager::InternalFilterCommandTarget(CPlayer *pAdmin, CPlayer *pTarget
 
 void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 {
+	SM_PROFILE("PlayerManager::ProcessCommandTarget");
+
 	CPlayer *pTarget, *pAdmin;
 	int max_clients, total = 0;
 
@@ -2011,6 +2032,8 @@ void CPlayer::Authorize_Post()
 
 void CPlayer::DoPostConnectAuthorization()
 {
+	SM_PROFILE("CPlayer::DoPostConnectAuthorization");
+
 	bool delay = false;
 
 	List<IClientListener *>::iterator iter;
@@ -2065,6 +2088,8 @@ bool CPlayer::RunAdminCacheChecks()
 
 void CPlayer::NotifyPostAdminChecks()
 {
+	SM_PROFILE("CPlayer::NotifyPostAdminChecks");
+
 	if (m_bAdminCheckSignalled)
 	{
 		return;
@@ -2097,6 +2122,8 @@ void CPlayer::NotifyPostAdminChecks()
 
 void CPlayer::DoBasicAdminChecks()
 {
+	SM_PROFILE("CPlayer::DoBasicAdminChecks");
+
 	if (GetAdminId() != INVALID_ADMIN_ID)
 	{
 		return;

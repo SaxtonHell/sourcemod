@@ -42,6 +42,7 @@
 #include <IGameConfigs.h>
 #include "frame_hooks.h"
 #include "logic_bridge.h"
+#include "sm_profiletool.h"
 
 SH_DECL_HOOK6(IServerGameDLL, LevelInit, SH_NOATTRIB, false, bool, const char *, const char *, const char *, const char *, bool, bool);
 SH_DECL_HOOK0_void(IServerGameDLL, LevelShutdown, SH_NOATTRIB, false);
@@ -709,6 +710,8 @@ void SourceModBase::RemoveGameFrameHook(GAME_FRAME_HOOK hook)
 
 void SourceModBase::ProcessGameFrameHooks(bool simulating)
 {
+	SM_PROFILE("SourceModBase::ProcessGameFrameHooks");
+
 	if (m_frame_hooks.size() == 0)
 	{
 		return;
