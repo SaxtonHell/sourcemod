@@ -32,6 +32,7 @@
 #include "common_logic.h"
 #include "PhraseCollection.h"
 #include "Translator.h"
+#include "ProfileTools.h"
 
 CPhraseCollection::CPhraseCollection()
 {
@@ -89,6 +90,8 @@ IPhraseFile *CPhraseCollection::GetFile(unsigned int file)
 
 TransError CPhraseCollection::FindTranslation(const char *key, unsigned int langid, Translation *pTrans)
 {
+	SM_PROFILE("CPhraseCollection::FindTranslation");
+
 	size_t i;
 
 	for (i = 0; i < m_Files.size(); i++)
@@ -110,6 +113,8 @@ bool CPhraseCollection::FormatString(char *buffer,
 								 size_t *pOutLength,
 								 const char **pFailPhrase)
 {
+	SM_PROFILE("CPhraseCollection::FormatString");
+
 	unsigned int arg;
 
 	arg = 0;

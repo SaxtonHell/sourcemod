@@ -34,6 +34,7 @@
 #include <ILibrarySys.h>
 #include <ISourceMod.h>
 #include "common_logic.h"
+#include "ProfileTools.h"
 #include "PluginSys.h"
 #include <am-utility.h>
 
@@ -1295,6 +1296,8 @@ void CExtensionManager::AddLibrary(IExtension *pSource, const char *library)
 
 bool CExtensionManager::LibraryExists(const char *library)
 {
+	SM_PROFILE("CExtensionManager::LibraryExists");
+
 	CExtension *pExt;
 
 	for (List<CExtension *>::iterator iter = m_Libs.begin();

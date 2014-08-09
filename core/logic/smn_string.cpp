@@ -35,6 +35,7 @@
 #include <ITextParsers.h>
 #include <ctype.h>
 #include "stringutil.h"
+#include "ProfileTools.h"
 
 inline const char *_strstr(const char *str, const char *substr)
 {
@@ -320,6 +321,8 @@ static cell_t sm_vformat(IPluginContext *pContext, const cell_t *params)
 /* :TODO: make this UTF8 safe */
 static cell_t BreakString(IPluginContext *pContext, const cell_t *params)
 {
+	SM_PROFILE("BreakString");
+
 	const char *input;
 	char *out;
 	size_t outMax;

@@ -35,6 +35,7 @@
 #include "common_logic.h"
 #include "PluginSys.h"
 #include "HandleSys.h"
+#include "ProfileTools.h"
 #include <assert.h>
 
 using namespace ke;
@@ -449,6 +450,8 @@ void ShareSystem::DropCapabilityProvider(IExtension *myself, IFeatureProvider *p
 FeatureStatus ShareSystem::TestFeature(IPluginRuntime *pRuntime, FeatureType feature, 
                                        const char *name)
 {
+	SM_PROFILE("ShareSystem::TestFeature");
+
 	switch (feature)
 	{
 	case FeatureType_Native:
@@ -464,6 +467,8 @@ FeatureStatus ShareSystem::TestFeature(IPluginRuntime *pRuntime, FeatureType fea
 
 FeatureStatus ShareSystem::TestNative(IPluginRuntime *pRuntime, const char *name)
 {
+	SM_PROFILE("ShareSystem::TestNative");
+
 	uint32_t index;
 
 	if (pRuntime->FindNativeByName(name, &index) == SP_ERROR_NONE)
@@ -487,6 +492,8 @@ FeatureStatus ShareSystem::TestNative(IPluginRuntime *pRuntime, const char *name
 
 FeatureStatus ShareSystem::TestCap(const char *name)
 {
+	SM_PROFILE("ShareSystem::TestCap");
+
 	StringHashMap<Capability>::Result r = m_caps.find(name);
 	if (!r.found())
 		return FeatureStatus_Unknown;

@@ -84,4 +84,26 @@ private:
 
 extern ProfileToolManager g_ProfileToolManager;
 
+class ProfileScope
+{
+public:
+	ProfileScope(const char *group, const char *name)
+	{
+		g_ProfileToolManager.EnterScope(group, name);
+	}
+
+	~ProfileScope()
+	{
+		g_ProfileToolManager.LeaveScope();
+	}
+};
+
+#define SM_PROFILE_GROUP_UNACCOUNTED	NULL
+#define SM_PROFILE_GROUP_SOURCEMOD		"SourceMod"
+
+#define SM_PROFILE(name)				SM_PROFILE_GROUP(SM_PROFILE_GROUP_SOURCEMOD, name)
+#define SM_PROFILE_UNACCOUNTED(name)	SM_PROFILE_GROUP(SM_PROFILE_GROUP_UNACCOUNTED, name)
+
+#define SM_PROFILE_GROUP(group, name)	ProfileScope profileScope(group, name)
+
 #endif // _include_sourcemod_logic_profile_tool_manager_h_
