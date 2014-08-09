@@ -103,6 +103,9 @@ INativeInterface *ninvoke = NULL;
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 IRootConsole *rootconsole = NULL;
 #endif
+#if defined SMEXT_ENABLE_PROFILING
+IProfileToolManager *profiletool = NULL;
+#endif
 
 /** Exports the main interface */
 PLATFORM_EXTERN_C IExtensionInterface *GetSMExtAPI()
@@ -196,6 +199,9 @@ bool SDKExtension::OnExtensionLoad(IExtension *me, IShareSys *sys, char *error, 
 #endif
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 	SM_GET_IFACE(ROOTCONSOLE, rootconsole);
+#endif
+#if defined SMEXT_ENABLE_PROFILING
+	SM_GET_IFACE(PROFILETOOLMANAGER, profiletool);
 #endif
 
 	if (SDK_OnLoad(error, maxlength, late))

@@ -114,16 +114,6 @@ static void RegisterProfiler(IProfilingTool *tool)
 	g_ProfileToolManager.RegisterTool(tool);
 }
 
-static void EnterProfileScope(const char *group, const char *name)
-{
-	g_ProfileToolManager.EnterScope(group, name);
-}
-
-static void LeaveProfileScope()
-{
-	g_ProfileToolManager.LeaveScope();
-}
-
 static sm_logic_t logic =
 {
 	NULL,
@@ -142,15 +132,13 @@ static sm_logic_t logic =
 	AddNatives,
 	DumpHandles,
 	DumpAdminCache,
-	RegisterProfiler,
-	EnterProfileScope,
-	LeaveProfileScope,
 	&g_PluginSys,
 	&g_ShareSys,
 	&g_Extensions,
 	&g_HandleSys,
 	&g_Forwards,
 	&g_Admins,
+	&g_ProfileToolManager,
 	NULL,
 	-1.0f
 };

@@ -28,6 +28,7 @@
 #ifndef _include_sourcemod_core_profiletool_h_
 #define _include_sourcemod_core_profiletool_h_
 
+#include <IProfileToolManager.h>
 #include "logic_bridge.h"
 
 namespace SourceMod
@@ -37,22 +38,16 @@ namespace SourceMod
 	public:
 		ProfileScope(const char *group, const char *name)
 		{
-			logicore.EnterProfileScope(group, name);
+			profiletool->EnterScope(group, name);
 		}
 
 		~ProfileScope()
 		{
-			logicore.LeaveProfileScope();
+			profiletool->LeaveScope();
 		}
 	};
 }
 
-#define SM_PROFILE_GROUP_UNACCOUNTED	NULL
-#define SM_PROFILE_GROUP_SOURCEMOD		"SourceMod"
-
-#define SM_PROFILE(name)				SM_PROFILE_GROUP(SM_PROFILE_GROUP_SOURCEMOD, name)
-#define SM_PROFILE_UNACCOUNTED(name)	SM_PROFILE_GROUP(SM_PROFILE_GROUP_UNACCOUNTED, name)
-
-#define SM_PROFILE_GROUP(group, name)	SourceMod::ProfileScope profileScope(group, name)
+#define SM_PROFILE(name)	SourceMod::ProfileScope profileScope(SM_PROFILE_GROUP_SOURCEMOD, name)
 
 #endif _include_sourcemod_core_profiletool_h_

@@ -28,7 +28,7 @@
 #ifndef _include_sourcemod_core_vprof_bridge_h_
 #define _include_sourcemod_core_vprof_bridge_h_
 
-#include <sp_vm_api.h>
+#include <IProfileToolManager.h>
 #include "sm_globals.h"
 #include <am-utility.h>
 

@@ -28,6 +28,7 @@
 #ifndef _include_sourcemod_logic_profile_tool_manager_h_
 #define _include_sourcemod_logic_profile_tool_manager_h_
 
+#include <IProfileToolManager.h>
 #include <sp_vm_api.h>
 #include <am-vector.h>
 #include <IShareSys.h>
@@ -35,9 +36,11 @@
 #include "common_logic.h"
 
 using namespace SourcePawn;
+using namespace SourceMod;
 
 class ProfileToolManager
-	: public SMGlobalClass,
+	: public IProfileToolManager,
+	  public SMGlobalClass,
 	  public IRootConsoleCommand
 {
 public:
@@ -50,6 +53,7 @@ public:
 	// IRootConsoleCommand
 	void OnRootConsoleCommand2(const char *cmdname, const ICommandArgs *args) KE_OVERRIDE;
 
+	// IProfileToolManager
 	void RegisterTool(IProfilingTool *tool) {
 		tools_.append(tool);
 	}
@@ -98,12 +102,6 @@ public:
 	}
 };
 
-#define SM_PROFILE_GROUP_UNACCOUNTED	NULL
-#define SM_PROFILE_GROUP_SOURCEMOD		"SourceMod"
-
-#define SM_PROFILE(name)				SM_PROFILE_GROUP(SM_PROFILE_GROUP_SOURCEMOD, name)
-#define SM_PROFILE_UNACCOUNTED(name)	SM_PROFILE_GROUP(SM_PROFILE_GROUP_UNACCOUNTED, name)
-
-#define SM_PROFILE_GROUP(group, name)	ProfileScope profileScope(group, name)
+#define SM_PROFILE(name) ProfileScope profileScope(SM_PROFILE_GROUP_SOURCEMOD, name)
 
 #endif // _include_sourcemod_logic_profile_tool_manager_h_

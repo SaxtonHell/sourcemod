@@ -3,6 +3,9 @@
 #define _INCLUDE_SOURCEPAWN_ENGINE_2_H_
 
 #include <sp_vm_api.h>
+#include <IProfileToolManager.h>
+
+using namespace SourceMod;
 
 namespace SourcePawn
 {
