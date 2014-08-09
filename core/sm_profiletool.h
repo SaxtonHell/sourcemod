@@ -30,20 +30,29 @@
 
 #include "logic_bridge.h"
 
-class ProfileScope
+namespace SourceMod
 {
-public:
-	ProfileScope(const char *group, const char *name)
+	class ProfileScope
 	{
-		logicore.EnterProfileScope(group, name);
-	}
+	public:
+		ProfileScope(const char *group, const char *name)
+		{
+			logicore.EnterProfileScope(group, name);
+		}
 
-	~ProfileScope()
-	{
-		logicore.LeaveProfileScope();
-	}
-};
+		~ProfileScope()
+		{
+			logicore.LeaveProfileScope();
+		}
+	};
+}
 
-#define SM_PROFILE_SCOPE(group, name) ProfileScope profileScope(group, name)
+#define SM_PROFILE_GROUP_UNACCOUNTED	NULL
+#define SM_PROFILE_GROUP_SOURCEMOD		"SourceMod"
+
+#define SM_PROFILE(name)				SM_PROFILE_GROUP(SM_PROFILE_GROUP_SOURCEMOD, name)
+#define SM_PROFILE_UNACCOUNTED(name)	SM_PROFILE_GROUP(SM_PROFILE_GROUP_UNACCOUNTED, name)
+
+#define SM_PROFILE_GROUP(group, name)	SourceMod::ProfileScope profileScope(group, name)
 
 #endif _include_sourcemod_core_profiletool_h_
