@@ -50,6 +50,7 @@
 namespace SourceMod
 {
 	struct IdentityToken_t;
+	class IProfilingTool;
 };
 #endif
 
@@ -1002,80 +1003,6 @@ namespace SourcePawn
 	 */
 	class IProfiler;
 
-	/**
-	 * @brief Encapsulates a profiling tool that may be attached to SourcePawn.
-	 */
-	class IProfilingTool
-	{
-	public:
-		/**
-		 * @brief Return the name of the profiling tool.
-		 *
-		 * @return                  Profiling tool name.
-		 */
-		virtual const char *Name() = 0;
-
-		/**
-		 * @brief Description of the profiler.
-		 *
-		 * @return                  Description.
-		 */
-		virtual const char *Description() = 0;
-
-		/**
-		 * @brief Called to render help text.
-		 *
-		 * @param  render           Function to render one line of text.
-		 */
-		virtual void RenderHelp(void (*render)(const char *fmt, ...)) = 0;
-	
-		/**
-		 * @brief Initiate a start command.
-		 *
-		 * Initiate start commands through a profiling tool, returning whether
-		 * or not the command is supported. If starting, SourceMod will generate
-		 * events even if it cannot signal the external profiler.
-		 */
-		virtual bool Start() = 0;
-
-		/**
-		 * @brief Initiate a stop command.
-		 *
-		 * @param render            Function to render any help messages.
-		 */
-		virtual void Stop(void (*render)(const char *fmt, ...)) = 0;
-	
-		/**
-		 * @brief Returns whether or not the profiler is currently profiling.
-		 *
-		 * @return                  True if active, false otherwise.
-		 */
-		virtual bool IsActive() = 0;
-
-		/**
-		 * @brief Returns whether the profiler is attached.
-		 *
-		 * @return                  True if attached, false otherwise.
-		 */
-		virtual bool IsAttached() = 0;
-
-		/**
-		 * @brief Enters the scope of an event.
-		 *
-		 * LeaveScope() mus be called exactly once for each call to EnterScope().
-		 *
-		 * @param group             A named budget group, or NULL for the default.
-		 * @param name              Event name.
-		 */
-		virtual void EnterScope(const char *group, const char *name) = 0;
-		
-		/**
-		 * @brief Leave a profiling scope. This must be called exactly once for
-		 * each call to EnterScope().
-		 */
-		virtual void LeaveScope() = 0;
-	};
-
 	struct sp_plugin_s;
 	typedef struct sp_plugin_s sp_plugin_t;
 
@@ -1351,7 +1278,7 @@ namespace SourcePawn
 		 *
 		 * @param tool      Profiling tool.
 		 */
-		virtual void SetProfilingTool(IProfilingTool *tool) =0;
+		virtual void SetProfilingTool(SourceMod::IProfilingTool *tool) =0;
 	};
 };
 

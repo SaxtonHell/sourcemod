@@ -132,13 +132,13 @@ static sm_logic_t logic =
 	AddNatives,
 	DumpHandles,
 	DumpAdminCache,
-	RegisterProfiler,
 	&g_PluginSys,
 	&g_ShareSys,
 	&g_Extensions,
 	&g_HandleSys,
 	&g_Forwards,
 	&g_Admins,
+	&g_ProfileToolManager,
 	NULL,
 	-1.0f
 };

@@ -44,7 +44,7 @@ VProfTool::VProfTool()
 void
 VProfTool::OnSourceModAllInitialized()
 {
-	logicore.RegisterProfiler(this);
+	profiletool->RegisterTool(this);
 }
 
 const char *

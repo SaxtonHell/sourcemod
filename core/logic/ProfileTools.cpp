@@ -40,6 +40,8 @@ void
 ProfileToolManager::OnSourceModAllInitialized()
 {
 	rootmenu->AddRootConsoleCommand2("prof", "Profiling", this);
+
+	sharesys->AddInterface(NULL, this);
 }
 
 void

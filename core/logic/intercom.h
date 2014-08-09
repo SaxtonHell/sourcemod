@@ -52,7 +52,7 @@ using namespace SourceHook;
  * Add 1 to the RHS of this expression to bump the intercom file
  * This is to prevent mismatching core/logic binaries
  */
-#define SM_LOGIC_MAGIC		(0x0F47C0DE - 28)
+#define SM_LOGIC_MAGIC		(0x0F47C0DE - 29)
 
 #if defined SM_LOGIC
 class IVEngineServer
@@ -108,6 +108,7 @@ namespace SourceMod
 	class IPhraseCollection;
 	class ITranslator;
 	class IGameConfig;
+	class IProfileToolManager;
 }
 
 class IVEngineServer;
@@ -331,13 +332,13 @@ struct sm_logic_t
 	void			(*AddNatives)(sp_nativeinfo_t *natives);
 	void			(*DumpHandles)(void (*dumpfn)(const char *fmt, ...));
 	void			(*DumpAdminCache)(FILE *);
-	void            (*RegisterProfiler)(IProfilingTool *tool);
 	IScriptManager	*scripts;
 	IShareSys		*sharesys;
 	IExtensionSys	*extsys;
 	IHandleSys		*handlesys;
 	IForwardManager	*forwardsys;
 	IAdminSystem	*adminsys;
+	IProfileToolManager *profiletool;
 	IdentityToken_t *core_ident;
 	float			sentinel;
 };

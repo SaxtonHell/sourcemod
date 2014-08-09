@@ -86,6 +86,7 @@ IExtensionSys *extsys;
 IHandleSys *handlesys;
 IForwardManager *forwardsys;
 IAdminSystem *adminsys;
+IProfileToolManager *profiletool;
 
 class VEngineServer_Logic : public IVEngineServer_Logic
 {
@@ -636,6 +637,7 @@ void InitLogicBridge()
 	handlesys = logicore.handlesys;
 	forwardsys = logicore.forwardsys;
 	adminsys = logicore.adminsys;
+	profiletool = logicore.profiletool;
 }
 
 bool StartLogicBridge(char *error, size_t maxlength)
