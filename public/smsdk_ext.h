@@ -97,6 +97,9 @@
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 #include <IRootConsoleMenu.h>
 #endif
+#if defined SMEXT_ENABLE_PROFILING
+#include <IProfileToolManager.h>
+#endif
 
 #if defined SMEXT_CONF_METAMOD
 #include <ISmmPlugin.h>
@@ -313,6 +316,23 @@ extern INativeInterface *ninvoke;
 #endif
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 extern IRootConsole *rootconsole;
+#endif
+#if defined SMEXT_ENABLE_PROFILING
+extern IProfileToolManager *profiletool;
+
+class ProfileScope
+{
+public:
+	ProfileScope(const char *group, const char *name)
+	{
+		profiletool->EnterScope(group, name);
+	}
+
+	~ProfileScope()
+	{
+		profiletool->LeaveScope();
+	}
+};
 #endif
 
 #if defined SMEXT_CONF_METAMOD
