@@ -514,7 +514,7 @@ ShowTimeLeft(client, who)
 	{
 		PrintToChatAll("[SM] %s", finalOutput);
 
-		if (who != TIMELEFT_ALL_ALWAYS)
+		if (client != 0)
 		{
 			// don't log timeleft displays that were triggered via timer
 			LogAction(client, -1, "\"%L\" triggered \"timeleft\"", client);
