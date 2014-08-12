@@ -552,8 +552,6 @@ int BaseContext::Execute2(IPluginFunction *function, const cell_t *params, unsig
 	JitFunction *fn;
 	cell_t _ignore_result;
 
-	EnterProfileScope profileScope(SM_PROFILE_GROUP_SOURCEPAWN, "EnterJIT");
-
 	if (!g_WatchdogTimer.HandleInterrupt())
 		return SP_ERROR_TIMEOUT;
 
@@ -575,9 +573,6 @@ int BaseContext::Execute2(IPluginFunction *function, const cell_t *params, unsig
 	if (result == NULL)
 		result = &_ignore_result;
 
-	/* We got this far.  It's time to start profiling. */
-	EnterProfileScope scriptScope(SM_PROFILE_GROUP_SOURCEPAWN, cfun->FullName());
-
 	/* See if we have to compile the callee. */
 	if (g_engine2.IsJitEnabled() && (fn = m_pRuntime->m_PubJitFuncs[public_id]) == NULL)
 	{
@@ -596,6 +591,9 @@ int BaseContext::Execute2(IPluginFunction *function, const cell_t *params, unsig
 			m_pRuntime->m_PubJitFuncs[public_id] = fn;
 		}
 	}
+
+	/* We got this far.  It's time to start profiling. */
+	EnterProfileScope scriptScope(SM_PROFILE_GROUP_SOURCEPAWN, cfun->FullName());
 
 	/* Save our previous state. */
 
