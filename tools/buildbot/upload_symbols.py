@@ -12,8 +12,13 @@ if len(sys.argv) < 3:
   sys.exit(1)
 
 SYMBOL_SERVER = os.environ['BREAKPAD_SYMBOL_SERVER']
+SYMBOL_DUMP = os.environ['BREAKPAD_SYMBOL_DUMP']
+
 symbol_file = sys.argv[1]
-cmd_argv = sys.argv[2:]
+dump_file = os.path.join(SYMBOL_DUMP, sys.argv[2])
+
+cmd_argv = sys.argv[3:]
+cmd_argv.insert(0, dump_file)
 
 sys.stdout.write(' '.join(cmd_argv))
 sys.stdout.write('\n')
