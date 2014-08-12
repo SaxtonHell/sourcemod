@@ -1007,7 +1007,7 @@ bool HandleSystem::TryAndFreeSomeHandles()
 
 	HANDLE_LOG_VERY_BAD("[SM] MEMORY LEAK DETECTED IN PLUGIN (file \"%s\")", highest_owner->GetFilename());
 	HANDLE_LOG_VERY_BAD("[SM] Unloading plugin to free %d handles.", highest_handle_count);
-	HANDLE_LOG_VERY_BAD("[SM] Contact the author(s) of this plugin to correct this error.", highest_handle_count);
+	HANDLE_LOG_VERY_BAD("[SM] Contact the author(s) of this plugin to correct this error.");
 	HANDLE_LOG_VERY_BAD("--------------------------------------------------------------------------");
 
 	const IdentityToken_t *pIdentity = highest_owner->GetIdentity();
