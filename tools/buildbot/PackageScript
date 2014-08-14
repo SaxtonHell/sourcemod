@@ -13,6 +13,7 @@ folder_list = [
   'addons/sourcemod/gamedata/sdkhooks.games',
   'addons/sourcemod/gamedata/sdktools.games',
   'addons/sourcemod/gamedata/sm-cstrike.games',
+  'addons/sourcemod/gamedata/custom',
   'addons/sourcemod/configs',
   'addons/sourcemod/configs/geoip',
   'addons/sourcemod/translations',
@@ -256,6 +257,10 @@ CopyFiles('gamedata/sm-cstrike.games', 'addons/sourcemod/gamedata/sm-cstrike.gam
     'game.css.txt',
     'master.games.txt',
   ]
+)
+CopyFiles('gamedata/custom', 'addons/sourcemod/gamedata/custom',
+	[ 'sm-tf2.games.txt',
+	]
 )
 CopyFiles('plugins', 'addons/sourcemod/scripting',
   [ 'admin-sql-prefetch.sp',

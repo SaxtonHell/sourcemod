@@ -360,6 +360,16 @@ native bool:TF2_IsHolidayActive(TFHoliday:holiday);
 native bool:TF2_IsPlayerInDuel(client);
 
 /**
+ * Equips an econ wearable (hat, misc, etc) to a player.
+ *
+ * @param client	Client index.
+ * @param wearable	Index of wearable entity.
+ * @noreturn
+ * @error			Invalid client index, client not in game, invalid wearable entity, or no mod support.
+*/
+native TF2_EquipWearable(client, wearable);
+
+/**
  * Removes an econ wearable (hat, misc, etc) from a player.
  * This also deletes the wearable entity.
  *
