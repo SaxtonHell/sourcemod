@@ -218,7 +218,7 @@ AttemptRTV(client)
 	
 	PrintToChatAll("[SM] %t", "RTV Requested", name, g_Votes, g_VotesNeeded);
 
-	LogAction(client, -1, "\"%L\" has requested to rock the vote", client);
+	LogAction(client, -1, "\"%L\" has requested to rock the vote (%d votes, %d needed)", client, g_Votes, g_VotesNeeded);
 	
 	if (g_Votes >= g_VotesNeeded)
 	{
