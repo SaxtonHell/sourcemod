@@ -46,6 +46,10 @@
 #include "ConsoleDetours.h"
 #include "logic_bridge.h"
 #include <sourcemod_version.h>
+#if SOURCE_ENGINE == SE_TF2
+// for CSteamID
+#include "steam/steamclientpublic.h"
+#endif
 
 PlayerManager g_Players;
 bool g_OnMapStarted = false;
@@ -405,6 +409,16 @@ void PlayerManager::RunAuthChecks()
 		pPlayer = &m_Players[m_AuthQueue[i]];
 #if SOURCE_ENGINE == SE_DOTA
 		authstr = engine->GetPlayerNetworkIDString(pPlayer->m_iIndex - 1);
+#elif SOURCE_ENGINE == SE_TF2
+		const CSteamID *steamid = engine->GetClientSteamID(pPlayer->m_pEdict);
+		if (steamid)
+		{
+			authstr = steamid->Render();
+		}
+		else
+		{
+			authstr = NULL;
+		}
 #else
 		authstr = engine->GetPlayerNetworkIDString(pPlayer->m_pEdict);
 #endif
@@ -2436,3 +2450,24 @@ void CPlayer::PrintToConsole(const char *pMsg)
 	engine->ClientPrintf(m_pEdict, pMsg);
 #endif
 }
+
+#if SOURCE_ENGINE == SE_TF2
+char *CSteamID::Render() const
+{
+	static char szSteamID[64];
+
+	switch (m_EAccountType)
+	{
+	case k_EAccountTypeInvalid:
+	case k_EAccountTypeIndividual:
+		snprintf(szSteamID, sizeof(szSteamID), "STEAM_0:%u:%u", (m_unAccountID % 2) ? 1 : 0, m_unAccountID / 2 );
+		break;
+
+	default:
+		szSteamID[0] = '\x0';
+		break;
+	}
+
+	return szSteamID;
+}
+#endif
