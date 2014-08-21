@@ -223,6 +223,14 @@ public:
 	virtual void CallOnCoreMapEnd() = 0;
 };
 
+class ILogger
+{
+public:
+	virtual void LogMessage(const char *msg, ...) = 0;
+	virtual void LogError(const char *msg, ...) = 0;
+	virtual void LogFatal(const char *msg, ...) = 0;
+};
+
 class AutoPluginList
 {
 public:
@@ -283,13 +291,10 @@ struct sm_core_t
 	ConVar *		(*FindConVar)(const char*);
 	unsigned int	(*strncopy)(char*, const char*, size_t);
 	char *			(*TrimWhitespace)(char *, size_t &);
-	void			(*LogError)(const char*, ...);
-	void			(*LogFatal)(const char*, ...);
-	void			(*Log)(const char*, ...);
-	void			(*LogToFile)(FILE *fp, const char*, ...);
 	void			(*LogToGame)(const char *message);
 	void			(*ConPrint)(const char *message);
 	const char *	(*GetCvarString)(ConVar*);
+	bool			(*GetCvarBool)(ConVar*);
 	size_t			(*Format)(char*, size_t, const char*, ...);
 	size_t			(*FormatArgs)(char*, size_t, const char*,va_list ap);
 	bool			(*gnprintf)(char *, size_t, const char *, IPhraseCollection *, void **,
@@ -335,7 +340,7 @@ struct sm_logic_t
 	char            *(*ReplaceEx)(char *, size_t, const char *, size_t, const char *, size_t, bool);
 	size_t          (*DecodeHexString)(unsigned char *, size_t, const char *);
 	IGameConfig *   (*GetCoreGameConfig)();
-	bool			(*OnLogPrint)(const char *msg);	// true to supercede
+	bool			(*OnLogPrint)(const char *msg);	// true to supersede
 	IDebugListener   *debugger;
 	void			(*GenerateError)(IPluginContext *, cell_t, int, const char *, ...);
 	void			(*AddNatives)(sp_nativeinfo_t *natives);
@@ -349,6 +354,7 @@ struct sm_logic_t
 	IAdminSystem	*adminsys;
 	IProfileToolManager *profiletool;
 	IdentityToken_t *core_ident;
+	ILogger			*logger;
 	float			sentinel;
 };
 

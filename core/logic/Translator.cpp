@@ -97,11 +97,11 @@ void CPhraseFile::ParseWarning(const char *message, ...)
 
 	if (!m_FileLogged)
 	{
-		smcore.LogError("[SM] Warning(s) encountered in translation file \"%s\"", m_File.c_str());
+		logger->LogError("[SM] Warning(s) encountered in translation file \"%s\"", m_File.c_str());
 		m_FileLogged = true;
 	}
 
-	smcore.LogError("[SM] %s", buffer);
+	logger->LogError("[SM] %s", buffer);
 }
 
 void CPhraseFile::ReparseFile()
@@ -143,8 +143,8 @@ void CPhraseFile::ReparseFile()
 			msg = m_ParseError.c_str();
 		}
 
-		smcore.LogError("[SM] Fatal error encountered parsing translation file \"%s\"", m_File.c_str());
-		smcore.LogError("[SM] Error (line %d, column %d): %s", states.line, states.col, msg);
+		logger->LogError("[SM] Fatal error encountered parsing translation file \"%s\"", m_File.c_str());
+		logger->LogError("[SM] Error (line %d, column %d): %s", states.line, states.col, msg);
 	}
 
 	const char *code;
@@ -176,10 +176,10 @@ void CPhraseFile::ReparseFile()
 				msg = m_ParseError.c_str();
 			}
 
-			smcore.LogError("[SM] Fatal error encountered parsing translation file \"%s/%s\"", 
+			logger->LogError("[SM] Fatal error encountered parsing translation file \"%s/%s\"", 
 				code, 
 				m_File.c_str());
-			smcore.LogError("[SM] Error (line %d, column %d): %s",
+			logger->LogError("[SM] Error (line %d, column %d): %s",
 				states.line,
 				states.col,
 				msg);
@@ -832,13 +832,13 @@ void Translator::RebuildLanguageDatabase()
 			str_err = m_CustomError.c_str();
 		}
 
-		smcore.LogError("[SM] Failed to parse language header file: \"%s\"", path);
-		smcore.LogError("[SM] Parse error (line %d, column %d): %s", states.line, states.col, str_err);
+		logger->LogError("[SM] Failed to parse language header file: \"%s\"", path);
+		logger->LogError("[SM] Parse error (line %d, column %d): %s", states.line, states.col, str_err);
 	}
 
 	if (!m_LCodeLookup.retrieve(m_InitialLang, &m_ServerLang))
 	{
-		smcore.LogError("Server language was set to bad language \"%s\" -- reverting to English", m_InitialLang);
+		logger->LogError("Server language was set to bad language \"%s\" -- reverting to English", m_InitialLang);
 
 		smcore.strncopy(m_InitialLang, "en", sizeof(m_InitialLang));
 		m_ServerLang = SOURCEMOD_LANGUAGE_ENGLISH;
@@ -846,7 +846,7 @@ void Translator::RebuildLanguageDatabase()
 
 	if (!m_Languages.size())
 	{
-		smcore.LogError("[SM] Fatal error, no languages found! Translation will not work.");
+		logger->LogError("[SM] Fatal error, no languages found! Translation will not work.");
 	}
 
 	for (size_t i=0; i<m_Files.size(); i++)
@@ -873,7 +873,7 @@ SMCResult Translator::ReadSMC_NewSection(const SMCStates *states, const char *na
 
 	if (!m_InLanguageSection)
 	{
-		smcore.LogError("[SM] Warning: Unrecognized section \"%s\" in languages.cfg", name);
+		logger->LogError("[SM] Warning: Unrecognized section \"%s\" in languages.cfg", name);
 	}
 
 	return SMCResult_Continue;
@@ -1028,11 +1028,11 @@ bool CoreTranslate(char *buffer,  size_t maxlength, const char *format, unsigned
 	{
 		if (fail_phrase != NULL)
 		{
-			smcore.LogError("[SM] Could not find core phrase: %s", fail_phrase);
+			logger->LogError("[SM] Could not find core phrase: %s", fail_phrase);
 		}
 		else
 		{
-			smcore.LogError("[SM] Unknown fatal error while translating a core phrase.");
+			logger->LogError("[SM] Unknown fatal error while translating a core phrase.");
 		}
 
 		return false;

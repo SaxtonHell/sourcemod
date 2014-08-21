@@ -1226,7 +1226,7 @@ static cell_t AddCommandListener(IPluginContext *pContext, const cell_t *params)
 
 	if (strcasecmp(name, "sm") == 0)
 	{
-		g_Logger.LogError("Request to register \"sm\" command denied.");
+		logger->LogError("Request to register \"sm\" command denied.");
 		return 0;
 	}
 
