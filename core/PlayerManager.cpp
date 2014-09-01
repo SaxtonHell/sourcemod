@@ -2309,7 +2309,7 @@ void CPlayer::PrintToConsole(const char *pMsg)
 }
 
 #if SOURCE_ENGINE == SE_TF2
-char *CSteamID::Render() const
+const char *CSteamID::Render() const
 {
 	static char szSteamID[64];
 
