@@ -50,4 +50,4 @@ namespace SourceMod
 
 #define SM_PROFILE(name)	SourceMod::ProfileScope profileScope(SM_PROFILE_GROUP_SOURCEMOD, name)
 
-#endif _include_sourcemod_core_profiletool_h_
+#endif // _include_sourcemod_core_profiletool_h_
