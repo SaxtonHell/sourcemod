@@ -809,6 +809,8 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 			CreateDataTimer(GetMapChangeTime(), Timer_ChangeMap, data);
 			WritePackString(data, map);
 			g_ChangeMapInProgress = false;
+
+			EndGame();
 		}
 		else // MapChange_RoundEnd
 		{
@@ -1159,6 +1161,27 @@ NominateResult:InternalNominateMap(String:map[], bool:force, owner)
 	}
 	
 	return Nominate_Added;
+}
+
+EndGame()
+{
+	for (new i = 1; i <= MaxClients; ++i)
+	{
+		if (IsClientInGame(i))
+		{
+			SetEntityFlags(i, GetEntityFlags(i)|FL_FROZEN);
+			ShowViewPortPanel(i, "scores");
+		}
+	}
+}
+
+ShowViewPortPanel(client, const String:name[])
+{
+	new Handle:msg = StartMessageOne("VGUIMenu", client);
+	BfWriteString(msg, name);
+	BfWriteByte(msg, 1);
+	BfWriteByte(msg, 0);
+	EndMessage();
 }
 
 /* Add natives to allow nominate and initiate vote to be call */
