@@ -1,3 +1,4 @@
+// vim: set ts=8 sts=2 sw=2 tw=99 et:
 /*  Pawn compiler - Error message system
  *  In fact a very simple system, using only 'panic mode'.
  *
@@ -67,12 +68,12 @@ static int sErrLine;     /* forced line number for the error message */
  *                     fcurrent   (reffered to only)
  *                     errflag    (altered)
  */
-SC_FUNC int error(int number,...)
+int error(int number,...)
 {
-static char *prefix[3]={ "error", "fatal error", "warning" };
+static const char *prefix[3]={ "error", "fatal error", "warning" };
 static int lastline,errorcount;
 static short lastfile;
-  char *msg,*pre;
+  const char *msg,*pre;
   va_list argptr;
 
   // sErrLine is used to temporarily change the line number of reported errors.
@@ -80,6 +81,8 @@ static short lastfile;
   // can lead to broken line numbers in error messages.
   int errline = sErrLine;
   sErrLine = -1;
+
+  bool is_warning = (number >= 200 && !sc_warnings_are_errors);
 
   /* errflag is reset on each semicolon.
    * In a two-pass compiler, an error should not be reported twice. Therefore
@@ -113,8 +116,13 @@ static short lastfile;
     errnum++;           /* a fatal error also counts as an error */
   } else {
     msg=warnmsg[number-200];
-    pre=prefix[2];
-    warnnum++;
+    if (sc_warnings_are_errors) {
+      pre=prefix[0];
+      errnum++;
+    } else {
+      pre=prefix[2];
+      warnnum++;
+    }
   } /* if */
 
   assert(errstart<=fline);
@@ -164,7 +172,7 @@ static short lastfile;
     errorcount=0;
   lastline=fline;
   lastfile=fcurrent;
-  if (number<200)
+  if (!is_warning)
     errorcount++;
   if (errorcount>=3)
     error(167);         /* too many error/warning messages on one line */
@@ -172,7 +180,7 @@ static short lastfile;
   return 0;
 }
 
-SC_FUNC void errorset(int code,int line)
+void errorset(int code,int line)
 {
   switch (code) {
   case sRESET:

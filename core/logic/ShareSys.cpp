@@ -376,7 +376,7 @@ PassRef<Native> ShareSystem::AddNativeToCache(CNativeOwner *pOwner, const sp_nat
 	if (i.found())
 		return NULL;
 
-	Ref<Native> entry = Newborn<Native>(new Native(pOwner, ntv));
+	Ref<Native> entry = new Native(pOwner, ntv);
 	m_NtvCache.insert(ntv->name, entry);
 	return entry;
 }
@@ -416,7 +416,7 @@ PassRef<Native> ShareSystem::AddFakeNative(IPluginFunction *pFunc, const char *n
 
 	CNativeOwner *owner = g_PluginSys.GetPluginByCtx(fake->ctx->GetContext());
 
-	entry = Newborn<Native>(new Native(owner, fake.take()));
+	entry = new Native(owner, fake.take());
 	m_NtvCache.insert(name, entry);
 
 	return entry;

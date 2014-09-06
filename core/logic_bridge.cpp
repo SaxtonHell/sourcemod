@@ -148,6 +148,10 @@ public:
 	{
 		return filesystem->FindNext(handle);
 	}
+	bool FindIsDirectory(FileFindHandle_t handle)
+	{
+		return filesystem->FindIsDirectory(handle);
+	}
 	void FindClose(FileFindHandle_t handle)
 	{
 		filesystem->FindClose(handle);
@@ -207,6 +211,18 @@ public:
 	void RemoveFile(const char *pRelativePath, const char *pathID)
 	{
 		filesystem->RemoveFile(pRelativePath, pathID);
+	}
+	void RenameFile(char const *pOldPath, char const *pNewPath, const char *pathID)
+	{
+		filesystem->RenameFile(pOldPath, pNewPath, pathID);
+	}
+	bool IsDirectory(const char *pFileName, const char *pathID)
+	{
+		return filesystem->IsDirectory(pFileName, pathID);
+	}
+	void CreateDirHierarchy(const char *path, const char *pathID)
+	{
+		filesystem->CreateDirHierarchy(path, pathID);
 	}
 };
 

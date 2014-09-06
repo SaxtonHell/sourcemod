@@ -23,6 +23,7 @@
 
 #define STACK_MARGIN 64
 
+using namespace sp;
 using namespace SourcePawn;
 
 static inline bool

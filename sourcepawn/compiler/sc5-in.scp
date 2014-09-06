@@ -21,7 +21,7 @@
  *  Version: $Id$
  */
 
-SC_FUNC int strexpand(char *dest, unsigned char *source, int maxlen, unsigned char pairtable[128][2]);
+int strexpand(char *dest, unsigned char *source, int maxlen, unsigned char pairtable[128][2]);
 
 #ifndef SCPACK
 # define SCPACK
@@ -42,7 +42,7 @@ unsigned char errstr_table[][2] = {
 };
 /*-*SCPACK end of pair table, do not change or remove this line */
 
-static char *errmsg[] = {
+static const char *errmsg[] = {
 #ifdef SCPACK
 /*001*/  "expected token: \"%s\", but found \"%s\"\n",
 /*002*/  "only a single statement (or expression) can follow each \"case\"\n",
@@ -201,6 +201,7 @@ static char *errmsg[] = {
 /*155*/  "expected newline, but found '%s'\n",
 /*156*/  "the 'any' type is not allowed in new-style natives\n",
 /*157*/  "'%s' is a reserved keyword\n",
+/*158*/  "multi-tags are no longer supported\n",
 #else
   "\315e\306\227\266k\217:\235\277bu\201fo\220\204\223\012",
   "\202l\224\250s\205g\346\356e\233\201(\243\315\214\267\202) \253 f\255low ea\305 \042c\353e\042\012",
@@ -362,7 +363,7 @@ static char *errmsg[] = {
 #endif
        };
 
-static char *fatalmsg[] = {
+static const char *fatalmsg[] = {
 #ifdef SCPACK
 /*160*/  "cannot read from file: \"%s\"\n",
 /*161*/  "cannot write to file: \"%s\"\n",
@@ -398,7 +399,7 @@ static char *fatalmsg[] = {
 #endif
        };
 
-static char *warnmsg[] = {
+static const char *warnmsg[] = {
 #ifdef SCPACK
 /*200*/  "symbol \"%s\" is truncated to %d characters\n",
 /*201*/  "redefinition of constant/macro (symbol \"%s\")\n",

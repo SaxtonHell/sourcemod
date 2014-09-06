@@ -57,6 +57,7 @@
 HandleType_t g_FileType;
 HandleType_t g_ValveFileType;
 HandleType_t g_DirType;
+HandleType_t g_ValveDirType;
 IChangeableForward *g_pLogHook = NULL;
 
 enum class FSType
@@ -73,10 +74,10 @@ public:
 		_fstype = fstype;
 	}
 public:
-	inline void *Open(const char *filename, const char *mode)
+	inline void *Open(const char *filename, const char *mode, const char *pathID)
 	{
 		if (_fstype == FSType::VALVE)
-			return smcore.filesystem->Open(filename, mode);
+			return smcore.filesystem->Open(filename, mode, pathID);
 		else
 			return fopen(filename, mode);
 	}
@@ -137,16 +138,16 @@ public:
 			fclose((FILE *)pFile);
 	}
 
-	inline bool Remove(const char *pFilePath)
+	inline bool Remove(const char *pFilePath, const char *pathID)
 	{
 		if (_fstype == FSType::VALVE)
 		{
-			if (!smcore.filesystem->FileExists(pFilePath))
+			if (!smcore.filesystem->FileExists(pFilePath, pathID))
 				return false;
 
-			smcore.filesystem->RemoveFile(pFilePath);
+			smcore.filesystem->RemoveFile(pFilePath, pathID);
 
-			if (smcore.filesystem->FileExists(pFilePath))
+			if (smcore.filesystem->FileExists(pFilePath, pathID))
 				return false;
 
 			return true;
@@ -176,6 +177,13 @@ private:
 	FSType _fstype;
 };
 
+struct ValveDirectory
+{
+	FileFindHandle_t hndl;
+	char szFirstPath[PLATFORM_MAX_PATH];
+	bool bHandledFirstPath;
+};
+
 class FileNatives : 
 	public SMGlobalClass,
 	public IHandleTypeDispatch,
@@ -190,6 +198,7 @@ public:
 		g_FileType = handlesys->CreateType("File", this, 0, NULL, NULL, g_pCoreIdent, NULL);
 		g_ValveFileType = handlesys->CreateType("ValveFile", this, 0, NULL, NULL, g_pCoreIdent, NULL);
 		g_DirType = handlesys->CreateType("Directory", this, 0, NULL, NULL, g_pCoreIdent, NULL);
+		g_ValveDirType = handlesys->CreateType("ValveDirectory", this, 0, NULL, NULL, g_pCoreIdent, NULL);
 		g_pLogHook = forwardsys->CreateForwardEx(NULL, ET_Hook, 1, NULL, Param_String);
 		pluginsys->AddPluginsListener(this);
 	}
@@ -200,9 +209,11 @@ public:
 		handlesys->RemoveType(g_DirType, g_pCoreIdent);
 		handlesys->RemoveType(g_FileType, g_pCoreIdent);
 		handlesys->RemoveType(g_ValveFileType, g_pCoreIdent);
+		handlesys->RemoveType(g_ValveDirType, g_pCoreIdent);
 		g_DirType = 0;
 		g_FileType = 0;
 		g_ValveFileType = 0;
+		g_ValveDirType = 0;
 	}
 	virtual void OnHandleDestroy(HandleType_t type, void *object)
 	{
@@ -220,6 +231,12 @@ public:
 		{
 			FileHandle_t fp = (FileHandle_t) object;
 			smcore.filesystem->Close(fp);
+		}
+		else if (type == g_ValveDirType)
+		{
+			ValveDirectory *valveDir = (ValveDirectory *)object;
+			smcore.filesystem->FindClose(valveDir->hndl);
+			delete valveDir;
 		}
 	}
 	virtual void AddLogHook(IPluginFunction *pFunc)
@@ -253,23 +270,56 @@ static cell_t sm_OpenDirectory(IPluginContext *pContext, const cell_t *params)
 		pContext->ThrowNativeErrorEx(err, NULL);
 		return 0;
 	}
-
-	char realpath[PLATFORM_MAX_PATH];
-	g_pSM->BuildPath(Path_Game, realpath, sizeof(realpath), "%s", path);
-
-	IDirectory *pDir = libsys->OpenDirectory(realpath);
-	if (!pDir)
+	
+	Handle_t handle = 0;
+	
+	if (params[0] >= 2 && params[2])
 	{
-		return 0;
+		char wildcardedPath[PLATFORM_MAX_PATH];
+		snprintf(wildcardedPath, sizeof(wildcardedPath), "%s*", path);
+		ValveDirectory *valveDir = new ValveDirectory;
+		
+		char *pathID;
+		if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+		
+		const char *pFirst = smcore.filesystem->FindFirstEx(wildcardedPath, pathID, &valveDir->hndl);
+		if (pFirst)
+		{
+			valveDir->bHandledFirstPath = false;
+			strncpy(valveDir->szFirstPath, pFirst, sizeof(valveDir->szFirstPath));
+		}
+		else
+		{
+			valveDir->bHandledFirstPath = true;
+		}
+		
+		handle = handlesys->CreateHandle(g_ValveDirType, valveDir, pContext->GetIdentity(), g_pCoreIdent, NULL);
 	}
+	else
+	{
+		char realpath[PLATFORM_MAX_PATH];
+		g_pSM->BuildPath(Path_Game, realpath, sizeof(realpath), "%s", path);
 
-	return handlesys->CreateHandle(g_DirType, pDir, pContext->GetIdentity(), g_pCoreIdent, NULL);
+		IDirectory *pDir = libsys->OpenDirectory(realpath);
+		if (!pDir)
+		{
+			return 0;
+		}
+
+		handle = handlesys->CreateHandle(g_DirType, pDir, pContext->GetIdentity(), g_pCoreIdent, NULL);
+	}
+	
+	return handle;
 }
 
 static cell_t sm_ReadDirEntry(IPluginContext *pContext, const cell_t *params)
 {
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
-	IDirectory *pDir;
+	void *pTempDir;
 	HandleError herr;
 	HandleSecurity sec;
 	int err;
@@ -277,44 +327,90 @@ static cell_t sm_ReadDirEntry(IPluginContext *pContext, const cell_t *params)
 	sec.pOwner = NULL;
 	sec.pIdentity = g_pCoreIdent;
 
-	if ((herr=handlesys->ReadHandle(hndl, g_DirType, &sec, (void **)&pDir))
-		!= HandleError_None)
+	if ((herr=handlesys->ReadHandle(hndl, g_DirType, &sec, &pTempDir)) == HandleError_None)
+	{
+		IDirectory *pDir = (IDirectory *)pTempDir;
+		if (!pDir->MoreFiles())
+		{
+			return 0;
+		}
+
+		cell_t *filetype;
+		if ((err=pContext->LocalToPhysAddr(params[4], &filetype)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+
+		if (pDir->IsEntryDirectory())
+		{
+			*filetype = 1;
+		} else if (pDir->IsEntryFile()) {
+			*filetype = 2;
+		} else {
+			*filetype = 0;
+		}
+
+		const char *path = pDir->GetEntryName();
+		if ((err=pContext->StringToLocalUTF8(params[2], params[3], path, NULL))
+			!= SP_ERROR_NONE)
+		{
+			return pContext->ThrowNativeErrorEx(err, NULL);
+		}
+
+		pDir->NextEntry();
+	}
+	else if ((herr=handlesys->ReadHandle(hndl, g_ValveDirType, &sec, &pTempDir)) == HandleError_None)
+	{
+		ValveDirectory *valveDir = (ValveDirectory *)pTempDir;
+		
+		const char *pEntry = NULL;
+		if (!valveDir->bHandledFirstPath)
+		{
+			if (valveDir->szFirstPath[0])
+			{
+				pEntry = valveDir->szFirstPath;
+			}
+		}
+		else
+		{
+			pEntry = smcore.filesystem->FindNext(valveDir->hndl);
+		}
+		
+		valveDir->bHandledFirstPath = true;
+		
+		// No more entries
+		if (!pEntry)
+		{
+			return 0;
+		}
+		
+		if ((err=pContext->StringToLocalUTF8(params[2], params[3], pEntry, NULL))
+			!= SP_ERROR_NONE)
+		{
+			return pContext->ThrowNativeErrorEx(err, NULL);
+		}
+
+		cell_t *filetype;
+		if ((err=pContext->LocalToPhysAddr(params[4], &filetype)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+
+		if (smcore.filesystem->FindIsDirectory(valveDir->hndl))
+		{
+			*filetype = 1;
+		} else {
+			*filetype = 2;
+		}		
+	}
+	else
 	{
 		return pContext->ThrowNativeError("Invalid file handle %x (error %d)", hndl, herr);
 	}
 
-	if (!pDir->MoreFiles())
-	{
-		return false;
-	}
-
-	cell_t *filetype;
-	if ((err=pContext->LocalToPhysAddr(params[4], &filetype)) != SP_ERROR_NONE)
-	{
-		pContext->ThrowNativeErrorEx(err, NULL);
-		return 0;
-	}
-
-	if (pDir->IsEntryDirectory())
-	{
-		*filetype = 1;
-	} else if (pDir->IsEntryFile()) {
-		*filetype = 2;
-	} else {
-		*filetype = 0;
-	}
-
-	const char *path = pDir->GetEntryName();
-	if ((err=pContext->StringToLocalUTF8(params[2], params[3], path, NULL))
-		!= SP_ERROR_NONE)
-	{
-		pContext->ThrowNativeErrorEx(err, NULL);
-		return 0;
-	}
-
-	pDir->NextEntry();
-
-	return true;
+	return 1;
 }
 
 static cell_t sm_OpenFile(IPluginContext *pContext, const cell_t *params)
@@ -336,6 +432,7 @@ static cell_t sm_OpenFile(IPluginContext *pContext, const cell_t *params)
 	HandleType_t handleType;
 	FSHelper fshelper;
 	const char *openpath;
+	char *pathID;
 	if (params[0] <= 2 || !params[3])
 	{
 		handleType = g_FileType;
@@ -347,12 +444,18 @@ static cell_t sm_OpenFile(IPluginContext *pContext, const cell_t *params)
 	}
 	else
 	{
+		if ((err=pContext->LocalToStringNULL(params[4], &pathID)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+		
 		handleType = g_ValveFileType;
 		fshelper.SetFSType(FSType::VALVE);
 		openpath = name;
 	}
 
-	void *pFile = fshelper.Open(openpath, mode);
+	void *pFile = fshelper.Open(openpath, mode, pathID);
 	if (pFile)
 	{
 		handle = handlesys->CreateHandle(handleType, pFile, pContext->GetIdentity(), g_pCoreIdent, NULL);
@@ -373,6 +476,7 @@ static cell_t sm_DeleteFile(IPluginContext *pContext, const cell_t *params)
 
 	FSHelper fshelper;
 	const char *filepath;
+	char *pathID;
 	if (params[0] < 2 || !params[2])
 	{
 		fshelper.SetFSType(FSType::STDIO);
@@ -382,11 +486,17 @@ static cell_t sm_DeleteFile(IPluginContext *pContext, const cell_t *params)
 	}
 	else
 	{
+		if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+		
 		fshelper.SetFSType(FSType::VALVE);
 		filepath = name;
 	}
 
-	return fshelper.Remove(filepath) ? 1 : 0;
+	return fshelper.Remove(filepath, pathID) ? 1 : 0;
 }
 
 static cell_t sm_ReadFileLine(IPluginContext *pContext, const cell_t *params)
@@ -521,7 +631,17 @@ static cell_t sm_FileExists(IPluginContext *pContext, const cell_t *params)
 
 	if (params[0] >= 2 && params[2] == 1)
 	{
-		return smcore.filesystem->FileExists(name) ? 1 : 0;
+		char *pathID = NULL;
+		if (params[0] >= 3)
+		{
+			if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
+			{
+				pContext->ThrowNativeErrorEx(err, NULL);
+				return 0;
+			}
+		}
+		
+		return smcore.filesystem->FileExists(name, pathID) ? 1 : 0;
 	}
 
 	char realpath[PLATFORM_MAX_PATH];
@@ -565,6 +685,19 @@ static cell_t sm_RenameFile(IPluginContext *pContext, const cell_t *params)
 		pContext->ThrowNativeErrorEx(err, NULL);
 		return 0;
 	}
+	
+	if (params[0] >= 3 && params[3] == 1)
+	{
+		char *pathID;
+		if ((err=pContext->LocalToStringNULL(params[4], &pathID)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+		
+		smcore.filesystem->RenameFile(oldpath, newpath, pathID);
+		return 1;
+	}
 
 	char new_realpath[PLATFORM_MAX_PATH];
 	g_pSM->BuildPath(Path_Game, new_realpath, sizeof(new_realpath), "%s", newpath);
@@ -586,6 +719,18 @@ static cell_t sm_DirExists(IPluginContext *pContext, const cell_t *params)
 	{
 		pContext->ThrowNativeErrorEx(err, NULL);
 		return 0;
+	}
+	
+	if (params[0] >= 2 && params[2] == 1)
+	{
+		char *pathID;
+		if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
+		{
+			pContext->ThrowNativeErrorEx(err, NULL);
+			return 0;
+		}
+		
+		return smcore.filesystem->IsDirectory(name, pathID) ? 1 : 0;
 	}
 
 	char realpath[PLATFORM_MAX_PATH];
@@ -627,9 +772,19 @@ static cell_t sm_FileSize(IPluginContext *pContext, const cell_t *params)
 
 	if (params[0] >= 2 && params[2] == 1)
 	{
-		if (smcore.filesystem->FileExists(name))
+		char *pathID = NULL;
+		if (params[0] >= 3)
 		{
-			return smcore.filesystem->Size(name);
+			if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
+			{
+				pContext->ThrowNativeErrorEx(err, NULL);
+				return -1;
+			}
+		}
+		
+		if (smcore.filesystem->FileExists(name, pathID))
+		{
+			return smcore.filesystem->Size(name, pathID);
 		}
 		else
 		{
@@ -692,9 +847,29 @@ static cell_t sm_SetFilePermissions(IPluginContext *pContext, const cell_t *para
 static cell_t sm_CreateDirectory(IPluginContext *pContext, const cell_t *params)
 {
 	char *name;
-	char realpath[PLATFORM_MAX_PATH];
-
 	pContext->LocalToString(params[1], &name);
+	
+	if (params[0] >= 3 && params[3] == 1)
+	{
+		int err;
+		char *pathID;
+		if ((err=pContext->LocalToStringNULL(params[4], &pathID)) != SP_ERROR_NONE)
+		{
+			return pContext->ThrowNativeErrorEx(err, NULL);
+		}
+		
+		if (smcore.filesystem->IsDirectory(name, pathID))
+			return 0;
+		
+		smcore.filesystem->CreateDirHierarchy(name, pathID);
+		
+		if (smcore.filesystem->IsDirectory(name, pathID))
+			return 1;
+		
+		return 0;
+	}
+	
+	char realpath[PLATFORM_MAX_PATH];
 	g_pSM->BuildPath(Path_Game, realpath, sizeof(realpath), "%s", name);
 
 #if defined PLATFORM_WINDOWS
