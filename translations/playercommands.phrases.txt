@@ -11,6 +11,12 @@
 		"en"			"Renamed {1}."
 	}
 
+	"Renamed single target"
+	{
+		"#format"		"{1:t},{2:s}"
+		"en"			"Renamed {1} to {2}."
+	}
+
 	"Rename player"
 	{
 		"en"			"Rename player"

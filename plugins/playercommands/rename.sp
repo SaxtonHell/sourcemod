@@ -178,18 +178,29 @@ public Action:Command_Rename(client, args)
 			sizeof(target_name),
 			tn_is_ml)) > 0)
 	{
-		if (tn_is_ml)
+		if (target_count == 1)
 		{
-			ShowActivity2(client, "[SM] ", "%t", "Renamed target", target_name);
+			if (tn_is_ml)
+			{
+				ShowActivity2(client, "[SM] ", "%t", "Renamed single target", target_name, arg2);
+			}
+			else
+			{
+				ShowActivity2(client, "[SM] ", "%t", "Renamed single target", "_s", target_name, arg2);
+			}
 		}
-		else
-		{
-			ShowActivity2(client, "[SM] ", "%t", "Renamed target", "_s", target_name);
-		}
-
-		if (target_count > 1) /* We cannot name everyone the same thing. */
+		else /* We cannot name everyone the same thing. */
 		{
 			randomize = true;
+
+			if (tn_is_ml)
+			{
+				ShowActivity2(client, "[SM] ", "%t", "Renamed target", target_name);
+			}
+			else
+			{
+				ShowActivity2(client, "[SM] ", "%t", "Renamed target", "_s", target_name);
+			}
 		}
 
 		for (new i = 0; i < target_count; i++)
