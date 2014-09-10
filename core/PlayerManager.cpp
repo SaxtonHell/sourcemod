@@ -47,10 +47,6 @@
 #include "logic_bridge.h"
 #include "sm_profiletool.h"
 #include <sourcemod_version.h>
-#if SOURCE_ENGINE == SE_TF2
-// for CSteamID
-#include "steam/steamclientpublic.h"
-#endif
 
 PlayerManager g_Players;
 bool g_OnMapStarted = false;
@@ -412,7 +408,7 @@ void PlayerManager::RunAuthChecks()
 		pPlayer = &m_Players[m_AuthQueue[i]];
 		pPlayer->UpdateAuthIds();
 		
-		authstr = pPlayer->GetSteam2Id(false);
+		authstr = pPlayer->m_AuthID.c_str();
 
 		if (!pPlayer->IsAuthStringValidated())
 		{
@@ -446,9 +442,11 @@ void PlayerManager::RunAuthChecks()
 			/* Send to plugins if player is still connected */
 			if (pPlayer->IsConnected() && m_clauth->GetFunctionCount())
 			{
+				const char *steamId = pPlayer->GetSteam2Id(false);
 				/* :TODO: handle the case of a player disconnecting in the middle */
 				m_clauth->PushCell(client);
-				m_clauth->PushString(authstr);
+				/* For legacy reasons, people are expecting the Steam2 id here if using Steam auth */
+				m_clauth->PushString(steamId ? steamId : authstr);
 				m_clauth->Execute(NULL);
 			}
 
@@ -731,8 +729,10 @@ void PlayerManager::OnClientPutInServer(edict_t *pEntity, const char *playername
 		/* Finally, tell plugins */
 		if (m_clauth->GetFunctionCount())
 		{
+			const char *steamId = pPlayer->GetSteam2Id(false);
 			m_clauth->PushCell(client);
-			m_clauth->PushString(pPlayer->GetSteam2Id(false));
+			/* For legacy reasons, people are expecting the Steam2 id here if using Steam auth */
+			m_clauth->PushString(steamId ? steamId : pPlayer->m_AuthID.c_str());
 			m_clauth->Execute(NULL);
 		}
 		pPlayer->Authorize_Post();
@@ -2006,7 +2006,7 @@ const CSteamID &CPlayer::GetSteamId(bool validated)
 
 const char *CPlayer::GetSteam2Id(bool validated)
 {
-	if (validated && !IsAuthStringValidated())
+	if (!m_Steam2Id.length() || (validated && !IsAuthStringValidated()))
 	{
 		return NULL;
 	}
@@ -2016,7 +2016,7 @@ const char *CPlayer::GetSteam2Id(bool validated)
 
 const char *CPlayer::GetSteam3Id(bool validated)
 {
-	if (validated && !IsAuthStringValidated())
+	if (!m_Steam2Id.length() || (validated && !IsAuthStringValidated()))
 	{
 		return NULL;
 	}
