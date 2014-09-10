@@ -80,6 +80,7 @@ new Handle:g_Cvar_RunOff = INVALID_HANDLE;
 new Handle:g_Cvar_RunOffPercent = INVALID_HANDLE;
 new Handle:g_Cvar_NumSpacers = INVALID_HANDLE;
 new Handle:g_Cvar_SpacerMode = INVALID_HANDLE;
+new Handle:g_Cvar_IntermissionDelay = INVALID_HANDLE;
 
 new Handle:g_VoteTimer = INVALID_HANDLE;
 new Handle:g_RetryTimer = INVALID_HANDLE;
@@ -145,7 +146,7 @@ public OnPluginStart()
 	g_Cvar_RunOffPercent = CreateConVar("sm_mapvote_runoffpercent", "50", "If winning choice has less than this percent of votes, hold a runoff", _, true, 0.0, true, 100.0);
 	g_Cvar_NumSpacers = CreateConVar("sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
 	g_Cvar_SpacerMode = CreateConVar("sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
-	
+	g_Cvar_IntermissionDelay = CreateConVar("sm_mapvote_intermissiondelay", "2.0", "Time between players are frozen and scoreboard is shown during map changes.");
 	RegAdminCmd("sm_mapvote", Command_Mapvote, ADMFLAG_CHANGEMAP, "sm_mapvote - Forces MapChooser to attempt to run a map vote now.");
 	RegAdminCmd("sm_setnextmap", Command_SetNextmap, ADMFLAG_CHANGEMAP, "sm_setnextmap <map>");
 
@@ -810,7 +811,8 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 			WritePackString(data, map);
 			g_ChangeMapInProgress = false;
 
-			EndGame();
+			FreezePlayers();
+			CreateTimer(GetIntermissionDelay(), Timer_ShowScores);
 		}
 		else // MapChange_RoundEnd
 		{
@@ -1067,6 +1069,20 @@ Float:GetMapChangeTime()
 	return changeTime;
 }
 
+Float:GetIntermissionDelay()
+{
+	new Float:changeTime = 2.0;
+
+	if (g_Cvar_IntermissionDelay != INVALID_HANDLE)
+	{
+		changeTime = GetConVarFloat(g_Cvar_IntermissionDelay);
+		if (changeTime < 0.0)
+			changeTime = 3.0;
+	}
+	return changeTime;
+}
+
+
 CreateNextVote()
 {
 	assert(g_NextMapList)
@@ -1163,13 +1179,23 @@ NominateResult:InternalNominateMap(String:map[], bool:force, owner)
 	return Nominate_Added;
 }
 
-EndGame()
+FreezePlayers()
 {
 	for (new i = 1; i <= MaxClients; ++i)
 	{
 		if (IsClientInGame(i))
 		{
 			SetEntityFlags(i, GetEntityFlags(i)|FL_FROZEN);
+		}
+	}
+}
+
+public Action:Timer_ShowScores(Handle:hTimer)
+{
+	for (new i = 1; i <= MaxClients; ++i)
+	{
+		if (IsClientInGame(i))
+		{
 			ShowViewPortPanel(i, "scores");
 		}
 	}
