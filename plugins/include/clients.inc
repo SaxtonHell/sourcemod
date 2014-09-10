@@ -286,7 +286,6 @@ native bool:GetClientIP(client, String:ip[], maxlen, bool:remport=true);
  * @return				True on success, false otherwise.
  * @error				If the client is not connected or the index is invalid.
  */
-#pragma deprecated Use GetClientAuthId
 native bool:GetClientAuthString(client, String:auth[], maxlen, bool:validate=true);
 
 /**
