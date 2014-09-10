@@ -807,7 +807,7 @@ public Handler_VoteFinishedGeneric(Handle:menu,
 		else if (g_ChangeTime == MapChange_Instant)
 		{
 			new Handle:data;
-			CreateDataTimer(GetMapChangeTime(), Timer_ChangeMap, data);
+			CreateDataTimer(GetMapChangeTime() + GetIntermissionDelay(), Timer_ChangeMap, data);
 			WritePackString(data, map);
 			g_ChangeMapInProgress = false;
 
@@ -1071,15 +1071,7 @@ Float:GetMapChangeTime()
 
 Float:GetIntermissionDelay()
 {
-	new Float:changeTime = 2.0;
-
-	if (g_Cvar_IntermissionDelay != INVALID_HANDLE)
-	{
-		changeTime = GetConVarFloat(g_Cvar_IntermissionDelay);
-		if (changeTime < 0.0)
-			changeTime = 3.0;
-	}
-	return changeTime;
+	return GetConVarFloat(g_Cvar_IntermissionDelay);
 }
 
 
