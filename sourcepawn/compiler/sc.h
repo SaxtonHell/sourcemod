@@ -525,16 +525,15 @@ typedef enum s_optmark {
 
 #define suSLEEP_INSTR 0x01      /* the "sleep" instruction was used */
 
-#define PUBLICTAG    0x80000000Lu
 #define FIXEDTAG     0x40000000Lu
 #define FUNCTAG      0x20000000Lu
 #define OBJECTTAG    0x10000000Lu
 #define ENUMTAG      0x08000000Lu
 #define METHODMAPTAG 0x04000000Lu
 #define STRUCTTAG    0x02000000Lu
-#define TAGMASK       (~PUBLICTAG)
 #define TAGTYPEMASK   (FUNCTAG | OBJECTTAG | ENUMTAG | METHODMAPTAG | STRUCTTAG)
 #define TAGFLAGMASK   (FIXEDTAG | TAGTYPEMASK)
+#define TAGID(tag)    ((tag) & ~(TAGFLAGMASK))
 #define CELL_MAX      (((ucell)1 << (sizeof(cell)*8-1)) - 1)
 
 
@@ -579,13 +578,6 @@ void pc_resetasm(void *handle);
 int  pc_writeasm(void *handle,const char *str);
 char *pc_readasm(void *handle,char *target,int maxchars);
 
-/* output to binary (.AMX) file */
-void *pc_openbin(char *filename);
-void pc_closebin(void *handle,int deletefile);
-void pc_resetbin(void *handle,long offset);
-int  pc_writebin(void *handle,void *buffer,int size);
-long pc_lengthbin(void *handle); /* return the length of the file */
-
 void sp_fdbg_ntv_start(int num_natives);
 void sp_fdbg_ntv_hook(int index, symbol *sym);
 
@@ -599,7 +591,6 @@ constvalue *append_constval(constvalue *table,const char *name,cell val,int inde
 constvalue *find_constval(constvalue *table,char *name,int index);
 void delete_consttable(constvalue *table);
 symbol *add_constant(const char *name,cell val,int vclass,int tag);
-void exporttag(int tag);
 void sc_attachdocumentation(symbol *sym);
 constvalue *find_tag_byval(int tag);
 int get_actual_compound(symbol *sym);
@@ -768,7 +759,7 @@ int error(int number,...);
 void errorset(int code,int line);
 
 /* function prototypes in SC6.C */
-int assemble(void *fout,void *fin);
+void assemble(const char *outname, void *fin);
 
 /* function prototypes in SC7.C */
 void stgbuffer_cleanup(void);

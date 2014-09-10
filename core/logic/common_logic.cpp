@@ -75,6 +75,7 @@ CNativeOwner g_CoreNatives;
 IScriptManager *scripts = &g_PluginSys;
 IExtensionSys *extsys = &g_Extensions;
 ILogger *logger = &g_Logger;
+IMenuManager *menus;
 
 static void AddCorePhraseFile(const char *filename)
 {
@@ -162,6 +163,7 @@ static void logic_init(const sm_core_t* core, sm_logic_t* _logic)
 	timersys = core->timersys;
 	playerhelpers = core->playerhelpers;
 	gamehelpers = core->gamehelpers;
+	menus = core->menus;
 	g_pSourcePawn = *core->spe1;
 	g_pSourcePawn2 = *core->spe2;
 	SMGlobalClass::head = core->listeners;
