@@ -181,7 +181,7 @@ void CookieManager::OnClientDisconnecting(int client)
 	
 	if (player)
 	{
-		pAuth = player->GetAuthString();
+		pAuth = player->GetSteam2Id();
 		g_ClientPrefs.ClearQueryCache(player->GetSerial());
 	}
 

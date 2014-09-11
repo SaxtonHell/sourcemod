@@ -362,7 +362,7 @@ size_t IsAuthIdConnected(char *authID)
 			continue;
 		}
 		
-		authString = player->GetAuthString();
+		authString = player->GetSteam2Id();
 		
 		if (authString == NULL || authString[0] == '\0')
 		{
