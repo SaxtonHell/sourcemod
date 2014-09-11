@@ -373,7 +373,7 @@ static cell_t BanClient(IPluginContext *pContext, const cell_t *params)
 				sizeof(command), 
 				"banid %d %s\n", 
 				ban_time,
-				pPlayer->GetAuthString());
+				pPlayer->GetSteam2Id());
 	
 			/* Kick, then ban */
 			if ((ban_flags & BANFLAG_NOKICK) != BANFLAG_NOKICK)
