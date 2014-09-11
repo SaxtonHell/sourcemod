@@ -2306,8 +2306,17 @@ void CPlayer::DoBasicAdminChecks()
 		}
 	}
 
-	/* Check steam id */
-	if ((id = adminsys->FindAdminByIdentity("steam", m_AuthID.c_str())) != INVALID_ADMIN_ID)
+	/* Check steam2 id */
+	if ((id = adminsys->FindAdminByIdentity("steam", GetSteam2Id())) != INVALID_ADMIN_ID)
+	{
+		if (g_Players.CheckSetAdmin(client, this, id))
+		{
+			return;
+		}
+	}
+
+	/* Check steam3 id */
+	if ((id = adminsys->FindAdminByIdentity("steam", GetSteam3Id())) != INVALID_ADMIN_ID)
 	{
 		if (g_Players.CheckSetAdmin(client, this, id))
 		{
