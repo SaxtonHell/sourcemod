@@ -1138,7 +1138,7 @@ reswitch:
 					{
 						return pCtx->ThrowNativeError("Client index %d is invalid", *value);
 					}
-					const char *auth = player->GetAuthString();
+					const char *auth = player->GetSteam2Id();
 					if (!auth || auth[0] == '\0')
 					{
 						auth = "STEAM_ID_PENDING";
