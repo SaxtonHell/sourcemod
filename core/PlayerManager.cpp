@@ -1910,7 +1910,8 @@ void CPlayer::UpdateAuthIds()
 	}
 	
 	EUniverse steam2universe = m_SteamId.GetEUniverse();
-	if (atoi(g_pGameConf->GetKeyValue("UseInvalidUniverseInSteam2IDs")) == 1)
+	const char *keyUseInvalidUniverse = g_pGameConf->GetKeyValue("UseInvalidUniverseInSteam2IDs");
+	if (keyUseInvalidUniverse && atoi(keyUseInvalidUniverse) == 1)
 	{
 		steam2universe = k_EUniverseInvalid;
 	}
