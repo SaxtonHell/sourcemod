@@ -93,9 +93,19 @@ void Logger::OnSourceModStartup(bool late)
 	InitLogger(m_Mode);
 }
 
+void Logger::OnSourceModAllInitialized()
+{
+	m_OnLogError = forwardsys->CreateForward("OnLogError", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_String);
+}
+
 void Logger::OnSourceModAllShutdown()
 {
 	CloseLogger();
+}
+
+void Logger::OnSourceModShutdown()
+{
+	forwardsys->ReleaseForward(m_OnLogError);
 }
 
 void Logger::OnSourceModLevelChange(const char *mapName)
@@ -188,6 +198,7 @@ void Logger::InitLogger(LoggingMode mode)
 {
 	m_Mode = mode;
 	m_Active = m_InitialState;
+	m_InErrorForward = false;
 
 	time_t t = g_pSM->GetAdjustedTime();
 	tm *curtime = localtime(&t);
@@ -395,6 +406,15 @@ void Logger::LogErrorEx(const char *vafmt, va_list ap)
 		return;
 	}
 
+	char errorBuffer[4096];
+	smcore.FormatArgs(errorBuffer, sizeof(errorBuffer), vafmt, ap);
+
+	if (LogToErrorForward(0 /* no source handle */, 0 /* core identity */, errorBuffer))
+	{
+		// error forward handled this error, don't log to file
+		return;
+	}
+
 	time_t t = g_pSM->GetAdjustedTime();
 	tm *curtime = localtime(&t);
 
@@ -499,6 +519,44 @@ const char *Logger::GetLogFileName(LogType type) const
 LoggingMode Logger::GetLoggingMode() const
 {
 	return m_Mode;
+}
+
+bool Logger::LogToErrorForward(int handle, int identity, const char *msg)
+{
+	if (m_InErrorForward)
+	{
+		// if we're erroring inside the error forward, don't recursively call the forward again
+		// we'll still want to log this error to file, however
+		return false;
+	}
+
+	if (m_OnLogError->GetFunctionCount() == 0)
+	{
+		// no listeners, log to file
+		return false;
+	}
+
+	m_InErrorForward = true;
+
+	cell_t result = Pl_Continue;
+
+	m_OnLogError->PushCell(handle);
+	m_OnLogError->PushCell(identity);
+	m_OnLogError->PushString(msg);
+	m_OnLogError->Execute(&result);
+
+	m_InErrorForward = false;
+
+	return result >= Pl_Handled;
+}
+
+bool Logger::SetInErrorForward(bool inForward)
+{
+	bool oldValue = m_InErrorForward;
+
+	m_InErrorForward = inForward;
+
+	return oldValue;
 }
 
 void Logger::EnableLogging()
