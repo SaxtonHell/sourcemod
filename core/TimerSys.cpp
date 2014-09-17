@@ -37,7 +37,7 @@
 #include "logic_bridge.h"
 #include "sm_profiletool.h"
 
-#define TIMER_MIN_ACCURACY		0.1
+#define TIMER_MIN_ACCURACY		0.01
 
 TimerSystem g_Timers;
 double g_fUniversalTime = 0.0f;
