@@ -50,6 +50,7 @@
 #endif
 
 HandleType_t g_PlIter;
+HandleType_t g_ContextTrace;
 
 IForward *g_OnLogAction = NULL;
 
@@ -67,6 +68,7 @@ public:
 		hacc.access[HandleAccess_Clone] = HANDLE_RESTRICT_IDENTITY|HANDLE_RESTRICT_OWNER;
 
 		g_PlIter = handlesys->CreateType("PluginIterator", this, 0, NULL, NULL, g_pCoreIdent, NULL);
+		g_ContextTrace = handlesys->CreateType("SPContextTrace", this, 0, NULL, NULL, g_pCoreIdent, NULL);
 
 		g_OnLogAction = forwardsys->CreateForward("OnLogAction", 
 			ET_Hook, 
@@ -82,12 +84,20 @@ public:
 	}
 	void OnHandleDestroy(HandleType_t type, void *object)
 	{
-		IPluginIterator *iter = (IPluginIterator *)object;
-		iter->Release();
+		if (type == g_PlIter)
+		{
+			IPluginIterator *iter = (IPluginIterator *)object;
+			iter->Release();
+		}
+		else if (type == g_ContextTrace)
+		{
+			g_pSourcePawn2->FreeContextTrace((IContextTrace *)object);
+		}
 	}
 	void OnSourceModShutdown()
 	{
 		forwardsys->ReleaseForward(g_OnLogAction);
+		handlesys->RemoveType(g_ContextTrace, g_pCoreIdent);
 		handlesys->RemoveType(g_PlIter, g_pCoreIdent);
 	}
 } g_CoreNativeHelpers;
@@ -745,6 +755,51 @@ static cell_t StoreToAddress(IPluginContext *pContext, const cell_t *params)
 	return 0;
 }
 
+static cell_t GetContextTrace(IPluginContext *pContext, const cell_t *params)
+{
+	IContextTrace *pTrace = pContext->GetContextTrace();
+
+	Handle_t hndl = handlesys->CreateHandle(g_ContextTrace, pTrace, pContext->GetIdentity(), g_pCoreIdent, NULL);
+
+	if (hndl == BAD_HANDLE)
+	{
+		g_pSourcePawn2->FreeContextTrace(pTrace);
+	}
+
+	return hndl;
+}
+
+static cell_t GetContextTraceInfo(IPluginContext *pContext, const cell_t *params)
+{
+	Handle_t hndl = params[1];
+	HandleSecurity sec = HandleSecurity(pContext->GetIdentity(), g_pCoreIdent);
+	HandleError err;
+
+	IContextTrace *pTrace = NULL;
+
+	if ((err = handlesys->ReadHandle(hndl, g_ContextTrace, &sec, (void **)&pTrace)) != HandleError_None)
+	{
+		return pContext->ThrowNativeError("Invalid Handle %x (error %d)", hndl, err);
+	}
+
+	CallStackInfo stackInfo;
+
+	if (pTrace->GetTraceInfo(&stackInfo))
+	{
+		pContext->StringToLocalUTF8(params[2], params[3], stackInfo.filename, NULL);
+		pContext->StringToLocalUTF8(params[4], params[5], stackInfo.function, NULL);
+
+		cell_t *pLineNum;
+		pContext->LocalToPhysAddr(params[6], &pLineNum);
+
+		*pLineNum = stackInfo.line;
+
+		return 1;
+	}
+
+	return 0;
+}
+
 REGISTER_NATIVES(coreNatives)
 {
 	{"ThrowError",				ThrowError},
@@ -773,5 +828,7 @@ REGISTER_NATIVES(coreNatives)
 	{"RequireFeature",          RequireFeature},
 	{"LoadFromAddress",         LoadFromAddress},
 	{"StoreToAddress",          StoreToAddress},
+	{"GetContextTrace",			GetContextTrace},
+	{"GetContextTraceInfo",		GetContextTraceInfo},
 	{NULL,						NULL},
 };

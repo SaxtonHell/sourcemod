@@ -857,3 +857,8 @@ void BaseContext::ClearLastNativeError()
 {
 	m_ctx.n_err = SP_ERROR_NONE;
 }
+
+IContextTrace *BaseContext::GetContextTrace()
+{
+	return new CContextTrace(m_pRuntime, SP_ERROR_NONE, NULL, 0);
+}

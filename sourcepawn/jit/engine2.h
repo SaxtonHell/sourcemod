@@ -30,6 +30,7 @@ namespace SourcePawn
 		void Shutdown();
 		IPluginRuntime *CreateEmptyRuntime(const char *name, uint32_t memory);
 		bool InstallWatchdogTimer(size_t timeout_ms);
+		void FreeContextTrace(IContextTrace *trace);
 
 		bool SetJitEnabled(bool enabled) {
 			jit_enabled_ = enabled;
