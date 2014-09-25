@@ -68,7 +68,7 @@ public:
 		hacc.access[HandleAccess_Clone] = HANDLE_RESTRICT_IDENTITY|HANDLE_RESTRICT_OWNER;
 
 		g_PlIter = handlesys->CreateType("PluginIterator", this, 0, NULL, NULL, g_pCoreIdent, NULL);
-		g_ContextTrace = handlesys->CreateType("SPContextTrace", this, 0, NULL, NULL, g_pCoreIdent, NULL );
+		g_ContextTrace = handlesys->CreateType("SPContextTrace", this, 0, NULL, NULL, g_pCoreIdent, NULL);
 
 		g_OnLogAction = forwardsys->CreateForward("OnLogAction", 
 			ET_Hook, 
