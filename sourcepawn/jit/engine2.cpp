@@ -210,3 +210,8 @@ bool SourcePawnEngine2::InstallWatchdogTimer(size_t timeout_ms)
 	return g_WatchdogTimer.Initialize(timeout_ms);
 }
 
+void SourcePawnEngine2::FreeContextTrace(IContextTrace *trace)
+{
+	delete trace;
+}
+

@@ -94,6 +94,7 @@ public: //IPluginContext
 	bool GetKey(int k, void **value);
 	void Refresh();
 	void ClearLastNativeError();
+	IContextTrace *GetContextTrace();
 public:
 	bool IsInExec();
 private:

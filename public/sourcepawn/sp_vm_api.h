@@ -60,6 +60,7 @@ namespace SourcePawn
 {
 	class IVirtualMachine;
 	class IPluginRuntime;
+	class IContextTrace;
 
 	/* Parameter flags */
 	#define SM_PARAM_COPYBACK		(1<<0)		/**< Copy an array/reference back after call */
@@ -901,6 +902,11 @@ namespace SourcePawn
 		 * @brief Clears the last native error.
 		 */
 		virtual void ClearLastNativeError() =0;
+
+		/**
+		 * @brief Returns a context trace representing the current execution state.
+		*/
+		virtual IContextTrace *GetContextTrace() =0;
 	};
 
 
@@ -1361,6 +1367,13 @@ namespace SourcePawn
 		 * @param tool      Profiling tool.
 		 */
 		virtual void SetProfilingTool(IProfilingTool *tool) =0;
+
+		/**
+		 * @brief Frees a context trace that was returned from a plugin context.
+		 *
+		 * @param context	Context trace.
+		*/
+		virtual void FreeContextTrace(IContextTrace *trace) =0;
 	};
 };
 

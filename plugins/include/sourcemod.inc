@@ -676,6 +676,31 @@ native LoadFromAddress(Address:addr, NumberType:size);
  */
 native StoreToAddress(Address:addr, data, NumberType:size); 
 
+
+/**
+ * Returns a context trace for the current execution state that can be used to build a function call stack trace.
+ * Must be closed with CloseHandle().
+ *
+ * @return		A handle representing a context trace.
+*/
+native Handle:GetContextTrace();
+
+/**
+ * Gets a single stack trace entry from a context trace.
+ * This function will return false when there are no more entries in the trace.
+ *
+ * @param trace				Context trace handle.
+ * @param fileName			Character buffer to store plugin file name.
+ * @param maxFileName		Maximum length of the fileName buffer.
+ * @param functionName		Character buffer to store plugin function name.
+ * @param maxFunctionName	Maximum length of the functionName buffer.
+ * @param line				Variable to store the plugin source line number.
+ *
+ * @return					True if the context trace contains more stack entries; otherwise, false.
+*/
+native bool:GetContextTraceInfo(Handle:trace, String:fileName[], maxFileName, String:functionName[], maxFunctionName, &line);
+
+
 #include <helpers>
 #include <entity>
 #include <entity_prop_stocks>
