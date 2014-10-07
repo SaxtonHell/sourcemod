@@ -570,6 +570,44 @@ static cell_t ReferenceToBCompatRef(IPluginContext *pContext, const cell_t *para
 	return g_HL2.ReferenceToBCompatRef(params[1]);
 }
 
+static cell_t GetServerSteamID(IPluginContext *pContext, const cell_t *params)
+{
+#if SOURCE_ENGINE == SE_BLOODYGOODTIME || SOURCE_ENGINE == SE_DARKMESSIAH || SOURCE_ENGINE == SE_EPISODEONE || SOURCE_ENGINE == SE_LEFT4DEAD || SOURCE_ENGINE == SE_LEFT4DEAD2 || SOURCE_ENGINE == SE_NUCLEARDAWN
+	return pContext->ThrowNativeError("This source engine branch does not support server SteamIDs");
+#else
+	const CSteamID *steamId = engine->GetGameServerSteamID();
+
+	if (!steamId)
+	{
+		return 0;
+	}
+
+	char szSteamId[64];
+	snprintf(szSteamId, sizeof(szSteamId), "%" PRIu64, steamId->ConvertToUint64());
+
+	pContext->StringToLocal(params[1], params[2], szSteamId);
+
+	return 1;
+#endif
+}
+
+static cell_t GetServerAccountID(IPluginContext *pContext, const cell_t *params)
+{
+#if SOURCE_ENGINE == SE_BLOODYGOODTIME || SOURCE_ENGINE == SE_DARKMESSIAH || SOURCE_ENGINE == SE_EPISODEONE || SOURCE_ENGINE == SE_LEFT4DEAD || SOURCE_ENGINE == SE_LEFT4DEAD2 || SOURCE_ENGINE == SE_NUCLEARDAWN
+	return pContext->ThrowNativeError("This source engine branch does not support server SteamIDs");
+#else
+	const CSteamID *steamId = engine->GetGameServerSteamID();
+
+	if (!steamId)
+	{
+		return 0;
+	}
+
+	return steamId->GetAccountID();
+#endif
+}
+
+
 REGISTER_NATIVES(halflifeNatives)
 {
 	{"CreateFakeClient",		CreateFakeClient},
@@ -605,5 +643,7 @@ REGISTER_NATIVES(halflifeNatives)
 	{"EntIndexToEntRef",		IndexToReference},
 	{"EntRefToEntIndex",		ReferenceToIndex},
 	{"MakeCompatEntRef",		ReferenceToBCompatRef},
+	{"GetServerSteamID",		GetServerSteamID},
+	{"GetServerAccountID",		GetServerAccountID},
 	{NULL,						NULL},
 };
