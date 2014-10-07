@@ -632,3 +632,11 @@ native MakeCompatEntRef(ref);
  * @error				No game support.
  */
 native bool:GetServerSteamID(String:buffer[], maxlen);
+
+/**
+ * Retrieves the AccountID portion of the server's assigned SteamID.
+ *
+ * @return				A 32bit integer representing the server's AccountID, if present; otherwise, 0.
+ * @error				No game support.
+ */
+native GetServerAccountID();

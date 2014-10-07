@@ -591,6 +591,22 @@ static cell_t GetServerSteamID(IPluginContext *pContext, const cell_t *params)
 #endif
 }
 
+static cell_t GetServerAccountID(IPluginContext *pContext, const cell_t *params)
+{
+#if SOURCE_ENGINE == SE_BLOODYGOODTIME || SOURCE_ENGINE == SE_DARKMESSIAH || SOURCE_ENGINE == SE_EPISODEONE || SOURCE_ENGINE == SE_LEFT4DEAD || SOURCE_ENGINE == SE_LEFT4DEAD2 || SOURCE_ENGINE == SE_NUCLEARDAWN
+	return pContext->ThrowNativeError("This source engine branch does not support server SteamIDs");
+#else
+	const CSteamID *steamId = engine->GetGameServerSteamID();
+
+	if (!steamId)
+	{
+		return 0;
+	}
+
+	return steamId->GetAccountID();
+#endif
+}
+
 
 REGISTER_NATIVES(halflifeNatives)
 {
@@ -628,5 +644,6 @@ REGISTER_NATIVES(halflifeNatives)
 	{"EntRefToEntIndex",		ReferenceToIndex},
 	{"MakeCompatEntRef",		ReferenceToBCompatRef},
 	{"GetServerSteamID",		GetServerSteamID},
+	{"GetServerAccountID",		GetServerAccountID},
 	{NULL,						NULL},
 };
