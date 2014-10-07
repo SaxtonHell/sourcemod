@@ -95,5 +95,13 @@
 #define SM_ARRAYSIZE(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 #endif
 
+#ifndef PRIu64
+#ifdef _WIN32
+#define PRIu64 "I64u"
+#else
+#define PRIu64 "llu"
+#endif
+#endif
+
 #endif //_INCLUDE_SOURCEMOD_PLATFORM_H_
 

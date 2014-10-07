@@ -623,3 +623,12 @@ native EntRefToEntIndex(ref);
  */
 native MakeCompatEntRef(ref);
 
+/**
+ * Retrieves the server's assigned SteamID as 64bit integer formatted as a string.
+ *
+ * @param buffer		String buffer to populate with the server's SteamID.
+ * @param maxlen		Maximum length of the output buffer.
+ * @return				True if the server has an assigned SteamID; otherwise, false.
+ * @error				No game support.
+ */
+native bool:GetServerSteamID(String:buffer[], maxlen);

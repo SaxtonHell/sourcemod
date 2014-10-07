@@ -44,14 +44,6 @@
 using namespace SourceHook;
 using namespace SourceMod;
 
-#ifndef PRIu64
-#ifdef _WIN32
-#define PRIu64 "I64u"
-#else
-#define PRIu64 "llu"
-#endif
-#endif
-
 static const int kActivityNone = 0;
 static const int kActivityNonAdmins = 1;		// Show admin activity to non-admins anonymously.
 static const int kActivityNonAdminsNames = 2;	// If 1 is specified, admin names will be shown.
