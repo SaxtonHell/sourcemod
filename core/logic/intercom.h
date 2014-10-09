@@ -52,7 +52,7 @@ using namespace SourceHook;
  * Add 1 to the RHS of this expression to bump the intercom file
  * This is to prevent mismatching core/logic binaries
  */
-#define SM_LOGIC_MAGIC		(0x0F47C0DE - 31)
+#define SM_LOGIC_MAGIC		(0x0F47C0DE - 32)
 
 #if defined SM_LOGIC
 class IVEngineServer
@@ -361,7 +361,7 @@ struct sm_logic_t
 	void			(*GenerateError)(IPluginContext *, cell_t, int, const char *, ...);
 	void			(*AddNatives)(sp_nativeinfo_t *natives);
 	void			(*DumpHandles)(void (*dumpfn)(const char *fmt, ...));
-	void			(*DumpAdminCache)(FILE *);
+	bool			(*DumpAdminCache)(const char *filename);
 	IScriptManager	*scripts;
 	IShareSys		*sharesys;
 	IExtensionSys	*extsys;

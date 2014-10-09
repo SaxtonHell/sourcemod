@@ -1783,7 +1783,7 @@ void iterator_group_grp_override(FILE *fp, const char *key, OverrideRule rule)
 	fprintf(fp, "\t\t\t\"@%s\"\t\t\"%s\"\n", key, str);
 }
 
-void AdminCache::DumpCache(FILE *fp)
+bool AdminCache::DumpCache(const char *filename)
 {
 	int *itable;
 	AdminId aid;
@@ -1792,6 +1792,12 @@ void AdminCache::DumpCache(FILE *fp)
 	unsigned int num;
 	AdminUser *pAdmin;
 	AdminGroup *pGroup;
+	
+	FILE *fp;
+	if ((fp = fopen(filename, "wt")) == NULL)
+	{
+		return false;
+	}
 
 	fprintf(fp, "\"Groups\"\n{\n");
 	
@@ -1922,6 +1928,10 @@ void AdminCache::DumpCache(FILE *fp)
 	for (FlagMap::iterator iter = m_CmdOverrides.iter(); !iter.empty(); iter.next())
 		iterator_glob_basic_override(fp, iter->key.chars(), iter->value);
 	fprintf(fp, "}\n");
+	
+	fclose(fp);
+	
+	return true;
 }
 
 AdminGroup *AdminCache::GetGroup(GroupId gid)
