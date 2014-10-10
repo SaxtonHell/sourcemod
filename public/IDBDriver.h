@@ -635,6 +635,7 @@ namespace SourceMod
 			dbiVersion = SMINTERFACE_DBI_VERSION;
 			port = 0;
 			maxTimeout = 0;
+			maxReadTimeout = 0;
 		}
 		unsigned int dbiVersion;		/**< DBI Version for backwards compatibility */
 		const char *host;				/**< Host string */
@@ -643,7 +644,8 @@ namespace SourceMod
 		const char *pass;				/**< Password to authenticate with */
 		const char *driver;				/**< Driver to use */
 		unsigned int port;				/**< Port to use, 0=default */
-		unsigned int maxTimeout;		/**< Maximum timeout, 0=default */
+		unsigned int maxTimeout;		/**< Maximum connect timeout, 0=default */
+		unsigned int maxReadTimeout;		/**< Maximum read timeout, 0=default */
 	};
 
 	/**
