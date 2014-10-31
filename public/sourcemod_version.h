@@ -62,7 +62,7 @@
 #endif
 #define SM_BUILD_TIMESTAMP	__DATE__ " " __TIME__
 
-#define SOURCEMOD_UPDATER_VERSION	"1.7.0-manual"
+#define SOURCEMOD_UPDATER_VERSION	"1.7.0-dev"
 
 #if !defined(SM_GENERATED_BUILD) || !defined(SM_USE_VERSIONLIB)
 # define SOURCEMOD_VERSION 		SM_VERSION_STRING
