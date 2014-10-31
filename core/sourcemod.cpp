@@ -326,6 +326,10 @@ void SourceModBase::StartSourceMod(bool late)
 	{
 		extsys->LoadAutoExtension("updater.ext." PLATFORM_LIB_EXT);
 	}
+	else
+	{
+		logger->LogMessage("SourceMod gamedata auto updater is disabled, skipping load");
+	}
 
 	const char *timeout = GetCoreConfigValue("SlowScriptTimeout");
 	if (timeout == NULL)
