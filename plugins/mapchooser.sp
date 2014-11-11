@@ -32,16 +32,6 @@
  * Version: $Id$
  */
  
-//#define DEBUG
-
-#if defined DEBUG
-	#define assert(%1) if (!(%1)) ThrowError("Debug Assertion Failed");
-	#define assert_msg(%1,%2) if (!(%1)) ThrowError(%2);
-#else
-	#define assert(%1)
-	#define assert_msg(%1,%2)
-#endif
-
 #pragma semicolon 1
 #include <sourcemod>
 #include <mapchooser>
@@ -1077,7 +1067,6 @@ Float:GetIntermissionDelay()
 
 CreateNextVote()
 {
-	assert(g_NextMapList)
 	ClearArray(g_NextMapList);
 	
 	decl String:map[PLATFORM_MAX_PATH];

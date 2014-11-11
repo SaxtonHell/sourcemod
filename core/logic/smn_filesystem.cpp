@@ -166,7 +166,7 @@ public:
 	: fp_(fp)
 	{}
 	~SystemFile() {
-		fclose(fp_);
+		Close();
 	}
 
 	static SystemFile *Open(const char *path, const char *mode) {
@@ -208,6 +208,7 @@ public:
 		if (!fp_)
 			return;
 		fclose(fp_);
+		fp_ = nullptr;
 	}
 	virtual SystemFile *AsSystemFile() {
 		return this;
@@ -222,7 +223,7 @@ private:
 
 struct ValveDirectory
 {
-	FileFindHandle_t hndl;
+	FileFindHandle_t hndl = -1;
 	char szFirstPath[PLATFORM_MAX_PATH];
 	bool bHandledFirstPath;
 };
@@ -306,13 +307,18 @@ static cell_t sm_OpenDirectory(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 	
+	if (!path[0])
+	{
+		return pContext->ThrowNativeError("Invalid file path");
+	}
+	
 	Handle_t handle = 0;
 	
 	if (params[0] >= 2 && params[2])
 	{
+		size_t len = strlen(path);
 		char wildcardedPath[PLATFORM_MAX_PATH];
-		snprintf(wildcardedPath, sizeof(wildcardedPath), "%s*", path);
-		ValveDirectory *valveDir = new ValveDirectory;
+		snprintf(wildcardedPath, sizeof(wildcardedPath), "%s%s*", path, (path[len-1] != '/' && path[len-1] != '\\') ? "/" : "");
 		
 		char *pathID;
 		if ((err=pContext->LocalToStringNULL(params[3], &pathID)) != SP_ERROR_NONE)
@@ -321,15 +327,18 @@ static cell_t sm_OpenDirectory(IPluginContext *pContext, const cell_t *params)
 			return 0;
 		}
 		
+		ValveDirectory *valveDir = new ValveDirectory;
+		
 		const char *pFirst = smcore.filesystem->FindFirstEx(wildcardedPath, pathID, &valveDir->hndl);
-		if (pFirst)
+		if (!pFirst)
 		{
-			valveDir->bHandledFirstPath = false;
-			strncpy(valveDir->szFirstPath, pFirst, sizeof(valveDir->szFirstPath));
+			delete valveDir;
+			return 0;
 		}
 		else
 		{
-			valveDir->bHandledFirstPath = true;
+			valveDir->bHandledFirstPath = false;
+			strncpy(valveDir->szFirstPath, pFirst, sizeof(valveDir->szFirstPath));
 		}
 		
 		handle = handlesys->CreateHandle(g_ValveDirType, valveDir, pContext->GetIdentity(), g_pCoreIdent, NULL);
