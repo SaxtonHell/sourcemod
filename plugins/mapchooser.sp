@@ -71,6 +71,7 @@ ConVar g_Cvar_RunOffPercent;
 ConVar g_Cvar_NumSpacers;
 ConVar g_Cvar_SpacerMode;
 ConVar g_Cvar_IntermissionDelay;
+ConVar g_Cvar_NominationsRandomized;
 
 new Handle:g_VoteTimer = INVALID_HANDLE;
 new Handle:g_RetryTimer = INVALID_HANDLE;
@@ -137,6 +138,7 @@ public OnPluginStart()
 	g_Cvar_NumSpacers = CreateConVar("sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
 	g_Cvar_SpacerMode = CreateConVar("sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
 	g_Cvar_IntermissionDelay = CreateConVar("sm_mapvote_intermissiondelay", "2.0", "Time between players are frozen and scoreboard is shown during map changes.");
+	g_Cvar_NominationsRandomized = CreateConVar( "sm_mapvote_nominations_randomized", "1", "Specifies if nominated maps will be randomly interspersed within map votes", _, true, 0.0, true, 1.0 );
 	RegAdminCmd("sm_mapvote", Command_Mapvote, ADMFLAG_CHANGEMAP, "sm_mapvote - Forces MapChooser to attempt to run a map vote now.");
 	RegAdminCmd("sm_setnextmap", Command_SetNextmap, ADMFLAG_CHANGEMAP, "sm_setnextmap <map>");
 
@@ -606,17 +608,18 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 	/* No input given - User our internal nominations and maplist */
 	if (inputlist == INVALID_HANDLE)
 	{
+		Handle mapsToAdd = CreateArray(ByteCountToCells(PLATFORM_MAX_PATH));
+
 		int nominateCount = GetArraySize(g_NominateList);
 		int voteSize = g_Cvar_IncludeMaps.IntValue;
 		
 		/* Smaller of the two - It should be impossible for nominations to exceed the size though (cvar changed mid-map?) */
 		int nominationsToAdd = nominateCount >= voteSize ? voteSize : nominateCount;
 		
-		
 		for (new i=0; i<nominationsToAdd; i++)
 		{
 			GetArrayString(g_NominateList, i, map, sizeof(map));
-			AddMenuItem(g_VoteMenu, map, map);
+			PushArrayString(mapsToAdd, map);
 			RemoveStringFromArray(g_NextMapList, map);
 			
 			/* Notify Nominations that this map is now free */
@@ -657,13 +660,28 @@ InitiateVote(MapChange:when, Handle:inputlist=INVALID_HANDLE)
 			count++;
 			
 			/* Insert the map and increment our count */
-			AddMenuItem(g_VoteMenu, map, map);
+			PushArrayString(mapsToAdd, map);
 			i++;
+		}
+
+		if (g_Cvar_NominationsRandomized.BoolValue)
+		{
+			// if we want to randomize in nominations, random sort all of our maps list
+			SortADTArray(mapsToAdd, Sort_Random, Sort_String);
+		}
+
+		for (new x = 0; x < GetArraySize(mapsToAdd); ++x)
+		{
+			// finally add the maps we want to the vote menu
+			GetArrayString(mapsToAdd, x, map, sizeof(map));
+			AddMenuItem(g_VoteMenu, map, map);
 		}
 		
 		/* Wipe out our nominations list - Nominations have already been informed of this */
 		ClearArray(g_NominateOwners);
 		ClearArray(g_NominateList);
+
+		CloseHandle(mapsToAdd);
 	}
 	else //We were given a list of maps to start the vote with
 	{
