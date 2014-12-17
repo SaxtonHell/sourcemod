@@ -52,7 +52,7 @@ ConVar g_Cvar_TriggerShow;
 ConVar g_Cvar_TimeleftInterval;
 ConVar g_Cvar_FriendlyFire;
 
-new Handle:g_Timer_TimeShow = INVALID_HANDLE;
+Handle g_Timer_TimeShow = null;
 
 ConVar g_Cvar_WinLimit;
 ConVar g_Cvar_FragLimit;
@@ -139,9 +139,9 @@ public Event_GameStart(Handle:event, const String:name[], bool:dontBroadcast)
 	g_TotalRounds = 0;	
 }
 
-public Event_TeamPlayWinPanel(Handle:event, const String:name[], bool:dontBroadcast)
+public Event_TeamPlayWinPanel(Event event, const String:name[], bool:dontBroadcast)
 {
-	if(GetEventInt(event, "round_complete") == 1 || StrEqual(name, "arena_win_panel"))
+	if (event.GetInt("round_complete") == 1 || StrEqual(name, "arena_win_panel"))
 	{
 		g_TotalRounds++;
 	}
@@ -174,7 +174,7 @@ public ConVarChange_TimeleftInterval(Handle:convar, const String:oldValue[], con
 	
 	if (newval < 1.0)
 	{
-		if (g_Timer_TimeShow != INVALID_HANDLE)
+		if (g_Timer_TimeShow != null)
 		{
 			KillTimer(g_Timer_TimeShow);		
 		}
@@ -182,7 +182,7 @@ public ConVarChange_TimeleftInterval(Handle:convar, const String:oldValue[], con
 		return;
 	}
 	
-	if (g_Timer_TimeShow != INVALID_HANDLE)
+	if (g_Timer_TimeShow != null)
 	{
 		KillTimer(g_Timer_TimeShow);
 		g_Timer_TimeShow = CreateTimer(newval, Timer_DisplayTimeleft, _, TIMER_REPEAT);

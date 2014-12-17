@@ -144,7 +144,7 @@ static void dolabel(void);
 static void doreturn(void);
 static void dofuncenum(int listmode);
 static void dotypedef();
-static void dounion();
+static void dotypeset();
 static void domethodmap(LayoutSpec spec);
 static void dobreak(void);
 static void docont(void);
@@ -157,7 +157,6 @@ static void inst_datetime_defines(void);
 static void inst_binary_name(char *binfname);
 static int operatorname(char *name);
 static int parse_new_typename(const token_t *tok);
-static bool parse_new_typename(const token_t *tok, int *outp);
 static int parse_new_decl(declinfo_t *decl, const token_t *first, int flags);
 static int reparse_old_decl(declinfo_t *decl, int flags);
 static int reparse_new_decl(declinfo_t *decl, int flags);
@@ -1527,8 +1526,8 @@ static void parse(void)
     case tTYPEDEF:
       dotypedef();
       break;
-    case tUNION:
-      dounion();
+    case tTYPESET:
+      dotypeset();
       break;
     case tSTRUCT:
       declstruct();
@@ -3116,7 +3115,7 @@ static int parse_new_typename(const token_t *tok)
   return -1;
 }
 
-static bool parse_new_typename(const token_t *tok, int *tagp)
+bool parse_new_typename(const token_t *tok, int *tagp)
 {
   int tag = parse_new_typename(tok);
   if (tag >= 0)
@@ -3415,7 +3414,14 @@ static int parse_new_decl(declinfo_t *decl, const token_t *first, int flags)
   if (!parse_new_typeexpr(&decl->type, first, flags))
     return FALSE;
 
+  decl->type.is_new = TRUE;
+
   if (flags & DECLMASK_NAMED_DECL) {
+    if ((flags & DECLFLAG_ARGUMENT) && matchtoken(tELLIPS)) {
+      decl->type.ident = iVARARGS;
+      return TRUE;
+    }
+
     if ((flags & DECLFLAG_MAYBE_FUNCTION) && matchtoken(tOPERATOR)) {
       decl->opertok = operatorname(decl->name);
       if (decl->opertok == 0)
@@ -3428,8 +3434,6 @@ static int parse_new_decl(declinfo_t *decl, const token_t *first, int flags)
       strcpy(decl->name, tok.str);
     }
   }
-
-  decl->type.is_new = TRUE;
 
   if (flags & DECLMASK_NAMED_DECL) {
     if (matchtoken('[')) {
@@ -3517,7 +3521,11 @@ int parse_decl(declinfo_t *decl, int flags)
 
   // Otherwise, we have to eat a symbol to tell.
   if (matchsymbol(&ident)) {
-    if (lexpeek(tSYMBOL) || lexpeek(tOPERATOR) || lexpeek('&')) {
+    if (lexpeek(tSYMBOL) ||
+        lexpeek(tOPERATOR) ||
+        lexpeek('&') ||
+        lexpeek(tELLIPS))
+    {
       // A new-style declaration only allows array dims or a symbol name, so
       // this is a new-style declaration.
       return parse_new_decl(decl, &ident.tok, flags);
@@ -3569,31 +3577,6 @@ static void check_void_decl(const declinfo_t *decl, int variable)
     error(145);
     return;
   }
-}
-
-static void define_constructor(methodmap_t *map, methodmap_method_t *method)
-{
-  symbol *sym = findglb(map->name, sGLOBAL);
-
-  if (sym) {
-    const char *type = "__unknown__";
-    switch (sym->ident) {
-      case iVARIABLE:
-      case iARRAY:
-      case iARRAYCELL:
-      case iARRAYCHAR:
-        type = "variable";
-        break;
-      case iFUNCTN:
-        type = "function";
-        break;
-    }
-    error(113, map->name, type);
-    return;
-  }
-
-  sym = addsym(map->name, 0, iPROXY, sGLOBAL, 0, 0);
-  sym->target = method->target;
 }
 
 // Current lexer position is, we've parsed "public", an optional "native", and
@@ -3651,7 +3634,13 @@ static void make_primitive(typeinfo_t *type, int tag)
   type->ident = iVARIABLE;
 }
 
-symbol *parse_inline_function(methodmap_t *map, const typeinfo_t *type, const char *name, int is_native, int is_ctor, int is_dtor)
+symbol *parse_inline_function(methodmap_t *map,
+                              const typeinfo_t *type,
+                              const char *name,
+                              int is_native,
+                              int is_ctor,
+                              int is_dtor,
+                              bool is_static)
 {
   declinfo_t decl;
   memset(&decl, 0, sizeof(decl));
@@ -3666,7 +3655,7 @@ symbol *parse_inline_function(methodmap_t *map, const typeinfo_t *type, const ch
   decl.type.is_new = TRUE;
 
   const int *thistag = NULL;
-  if (!is_ctor)
+  if (!is_ctor && !is_static)
     thistag = &map->tag;
 
   // Build a new symbol. Construct a temporary name including the class.
@@ -3778,7 +3767,7 @@ int parse_property_accessor(const typeinfo_t *type, methodmap_t *map, methodmap_
       ret_type = &voidtype;
     }
 
-    target = parse_inline_function(map, ret_type, tmpname, is_native, FALSE, FALSE);
+    target = parse_inline_function(map, ret_type, tmpname, is_native, FALSE, FALSE, false);
   }
 
   if (!target)
@@ -3877,7 +3866,11 @@ methodmap_method_t *parse_method(methodmap_t *map)
   int is_dtor = 0;
   int is_bind = 0;
   int is_native = 0;
+  bool is_static = false;
   const char *spectype = layout_spec_name(map->spec);
+
+  if (matchtoken(tSTATIC))
+    is_static = true;
 
   // This stores the name of the method (for destructors, we add a ~).
   token_ident_t ident;
@@ -3890,7 +3883,8 @@ methodmap_method_t *parse_method(methodmap_t *map)
   typeinfo_t type;
   memset(&type, 0, sizeof(type));
 
-  if (matchtoken('~')) {
+  // Destructors cannot be static.
+  if (!is_static && matchtoken('~')) {
     // We got something like "public ~Blah = X"
     is_bind = TRUE;
     is_dtor = TRUE;
@@ -3977,6 +3971,11 @@ methodmap_method_t *parse_method(methodmap_t *map)
       error(114, "constructor", spectype, map->name);
   }
 
+  if (is_ctor && is_static) {
+    // Constructors may not be static.
+    error(175);
+  }
+
   symbol *target = NULL;
   if (is_bind) {
     // Find an existing symbol.
@@ -3986,7 +3985,7 @@ methodmap_method_t *parse_method(methodmap_t *map)
     else if (target->ident != iFUNCTN) 
       error(10);
   } else {
-    target = parse_inline_function(map, &type, ident.name, is_native, is_ctor, is_dtor);
+    target = parse_inline_function(map, &type, ident.name, is_native, is_ctor, is_dtor, is_static);
   }
 
   if (!target)
@@ -4024,16 +4023,21 @@ methodmap_method_t *parse_method(methodmap_t *map)
   method->target = target;
   method->getter = NULL;
   method->setter = NULL;
+  method->is_static = is_static;
 
   // If the symbol is a constructor, we bypass the initial argument checks.
   if (is_ctor) {
-    define_constructor(map, method);
-  } else if (!check_this_tag(map, target)) {
-    error(108, spectype, map->name);
+    if (map->ctor)
+      error(113, map->name);
+  } else if (!is_static) {
+    if (!check_this_tag(map, target))
+      error(108, spectype, map->name);
   }
 
   if (is_dtor)
     map->dtor = method;
+  if (is_ctor)
+    map->ctor = method;
 
   require_newline(is_bind || (target->usage & uNATIVE));
   return method;
@@ -4047,7 +4051,6 @@ static void domethodmap(LayoutSpec spec)
 {
   int val;
   char *str;
-  LayoutSpec old_spec;
   methodmap_t *parent = NULL;
   const char *spectype = layout_spec_name(spec);
 
@@ -4060,8 +4063,9 @@ static void domethodmap(LayoutSpec spec)
   if (!isupper(*mapname))
     error(109, spectype);
 
-  old_spec = deduce_layout_spec_by_name(mapname);
-  if (!can_redef_layout_spec(spec, old_spec))
+  LayoutSpec old_spec = deduce_layout_spec_by_name(mapname);
+  int can_redef = can_redef_layout_spec(spec, old_spec);
+  if (!can_redef)
     error(110, mapname, layout_spec_name(old_spec));
 
   if (matchtoken('<')) {
@@ -4090,6 +4094,46 @@ static void domethodmap(LayoutSpec spec)
     map->tag = pc_addtag_flags(mapname, FIXEDTAG | OBJECTTAG);
   }
   methodmap_add(map);
+
+  if (can_redef) {
+    symbol *sym = findglb(mapname, sGLOBAL);
+    if (sym && sym->ident != iMETHODMAP) {
+      // We should only hit this on the first pass. Assert really hard that
+      // we're about to kill an enum definition and not something random.
+      assert(sc_status == statFIRST);
+      assert(sym->ident == iCONSTEXPR);
+      assert(TAGID(map->tag) == TAGID(sym->tag));
+
+      sym->ident = iMETHODMAP;
+
+      // Kill previous enumstruct properties, if any.
+      if (sym->usage & uENUMROOT) {
+        for (constvalue *cv = sym->dim.enumlist; cv; cv = cv->next) {
+          symbol *csym = findglb(cv->name, sGLOBAL);
+          if (csym &&
+              csym->ident == iCONSTEXPR &&
+              csym->parent == sym &&
+              (csym->usage & uENUMFIELD))
+          {
+            csym->usage &= ~uENUMFIELD;
+            csym->parent = NULL;
+          }
+        }
+        delete_consttable(sym->dim.enumlist);
+        free(sym->dim.enumlist);
+        sym->dim.enumlist = NULL;
+      }
+    } else if (!sym) {
+      sym = addsym(
+        mapname,      // name
+        0,            // addr
+        iMETHODMAP,   // ident
+        sGLOBAL,      // vclass
+        map->tag,     // tag
+        uDEFINE);     // usage
+    }
+    sym->methodmap = map;
+  }
 
   needtoken('{');
   while (!matchtoken('}')) {
@@ -4355,8 +4399,8 @@ static void dotypedef()
   functags_add(def, &type);
 }
 
-// Unsafe union - only supports function types. This is a transition hack for SP2.
-static void dounion()
+// Unsafe typeset - only supports function types. This is a transition hack for SP2.
+static void dotypeset()
 {
   token_ident_t ident;
   if (!needsymbol(&ident))
@@ -4585,8 +4629,8 @@ static void decl_enum(int vclass)
   int tag,explicittag;
   cell increment,multiplier;
   constvalue *enumroot;
-  symbol *enumsym;
   LayoutSpec spec;
+  symbol *enumsym = nullptr;
 
   /* get an explicit tag, if any (we need to remember whether an explicit
    * tag was passed, even if that explicit tag was "_:", so we cannot call
@@ -4653,18 +4697,34 @@ static void decl_enum(int vclass)
   } /* if */
 
   if (strlen(enumname)>0) {
-    /* already create the root symbol, so the fields can have it as their "parent" */
-    enumsym=add_constant(enumname,0,vclass,tag);
-    if (enumsym!=NULL)
-      enumsym->usage |= uENUMROOT;
-    /* start a new list for the element names */
-    if ((enumroot=(constvalue*)malloc(sizeof(constvalue)))==NULL)
-      error(FATAL_ERROR_OOM);                       /* insufficient memory (fatal error) */
-    memset(enumroot,0,sizeof(constvalue));
+    if (vclass == sGLOBAL) {
+      if ((enumsym = findglb(enumname, vclass)) != NULL) {
+        // If we were previously defined as a methodmap, don't overwrite the
+        // symbol. Otherwise, flow into add_constant where we will error.
+        if (enumsym->ident != iMETHODMAP)
+          enumsym = nullptr;
+      }
+    }
+
+    if (!enumsym) {
+      /* create the root symbol, so the fields can have it as their "parent" */
+      enumsym=add_constant(enumname,0,vclass,tag);
+      if (enumsym!=NULL)
+        enumsym->usage |= uENUMROOT;
+      /* start a new list for the element names */
+      if ((enumroot=(constvalue*)malloc(sizeof(constvalue)))==NULL)
+        error(FATAL_ERROR_OOM);                       /* insufficient memory (fatal error) */
+      memset(enumroot,0,sizeof(constvalue));
+    }
   } else {
     enumsym=NULL;
     enumroot=NULL;
   } /* if */
+
+  // If this enum is for a methodmap, forget the symbol so code below doesn't
+  // build an enum struct.
+  if (enumsym && enumsym->ident == iMETHODMAP)
+    enumsym = NULL;
 
   needtoken('{');
   /* go through all constants */
@@ -4719,7 +4779,7 @@ static void decl_enum(int vclass)
   matchtoken(';');      /* eat an optional ; */
 
   /* set the enum name to the "next" value (typically the last value plus one) */
-  if (enumsym!=NULL) {
+  if (enumsym) {
     assert((enumsym->usage & uENUMROOT)!=0);
     enumsym->addr=value;
     /* assign the constant list */
@@ -6508,8 +6568,8 @@ static int testsymbols(symbol *root,int level,int testlabs,int testconst)
         error(203,sym->name);       /* symbol isn't used: ... */
       } /* if */
       break;
-    case iPROXY:
-      // Ignore usage on proxies.
+    case iMETHODMAP:
+      // Ignore usage on methodmaps.
       break;
     default:
       /* a variable */

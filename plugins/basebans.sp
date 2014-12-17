@@ -99,7 +99,7 @@ LoadBanReasons()
 {
 	delete g_hKvBanReasons;
 
-	g_hKvBanReasons = KeyValues("banreasons");
+	g_hKvBanReasons = new KeyValues("banreasons");
 
 	if (g_hKvBanReasons.ImportFromFile(g_BanReasonsPath))
 	{
@@ -124,8 +124,10 @@ LoadBanReasons()
 	}
 }
 
-public OnAdminMenuReady(TopMenu topmenu)
+public OnAdminMenuReady(Handle aTopMenu)
 {
+	TopMenu topmenu = TopMenu.FromHandle(aTopMenu);
+
 	/* Block us from being called twice */
 	if (topmenu == hTopMenu)
 	{

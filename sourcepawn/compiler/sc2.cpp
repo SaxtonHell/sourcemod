@@ -1959,30 +1959,149 @@ const char *sc_tokens[] = {
          "*=", "/=", "%=", "+=", "-=", "<<=", ">>>=", ">>=", "&=", "^=", "|=",
          "||", "&&", "==", "!=", "<=", ">=", "<<", ">>>", ">>", "++", "--",
          "...", "..", "::",
+         "acquire",
+         "as",
          "assert",
-         "*begin", "break",
-         "case", "cellsof", "char", "const", "continue",
-         "decl", "default", "defined", "delete", "do",
-         "else", "*end", "enum", "exit",
-         "for", "forward", "funcenum", "functag", "function",
+         "*begin",
+         "break",
+         "builtin",
+         "catch",
+         "case",
+         "cast_to",
+         "cellsof",
+         "char",
+         "const",
+         "continue",
+         "decl",
+         "default",
+         "defined",
+         "delete",
+         "do",
+         "double",
+         "else",
+         "*end",
+         "enum",
+         "exit",
+         "explicit",
+         "finally",
+         "for",
+         "foreach",
+         "forward",
+         "funcenum",
+         "functag",
+         "function",
          "goto",
-         "if", "int",
+         "if",
+         "implicit",
+         "import",
+         "in",
+         "int",
+         "int8",
+         "int16",
+         "int32",
+         "int64",
+         "interface",
+         "intn",
+         "let",
          "methodmap",
-         "native", "new", "null", "__nullable__",
-         "object", "operator",
+         "namespace",
+         "native",
+         "new",
+         "null",
+         "__nullable__",
+         "object",
+         "operator",
+         "package",
+         "private",
+         "protected",
          "public",
+         "readonly",
          "return",
-         "sizeof", "sleep", "static", "stock", "struct", "switch",
-         "tagof", "*then", "this", "typedef",
+         "sealed",
+         "sizeof",
+         "sleep",
+         "static",
+         "stock",
+         "struct",
+         "switch",
+         "tagof",
+         "*then",
+         "this",
+         "throw",
+         "try",
+         "typedef",
+         "typeof",
+         "typeset",
+         "uint8",
+         "uint16",
+         "uint32",
+         "uint64",
+         "uintn",
          "union",
+         "using",
+         "var",
+         "variant",
+         "view_as",
+         "virtual",
          "void",
+         "volatile",
          "while",
+         "with",
          "#assert", "#define", "#else", "#elseif", "#emit", "#endif", "#endinput",
          "#endscript", "#error", "#file", "#if", "#include", "#line", "#pragma",
          "#tryinclude", "#undef",
          ";", ";", "-integer value-", "-rational value-", "-identifier-",
          "-label-", "-string-", "-string-"
 };
+
+static inline bool
+IsUnimplementedKeyword(int token)
+{
+  switch (token) {
+    case tACQUIRE:
+    case tAS:
+    case tCATCH:
+    case tCAST_TO:
+    case tDOUBLE:
+    case tEXPLICIT:
+    case tFINALLY:
+    case tFOREACH:
+    case tIMPLICIT:
+    case tIMPORT:
+    case tIN:
+    case tINT8:
+    case tINT16:
+    case tINT32:
+    case tINT64:
+    case tINTERFACE:
+    case tINTN:
+    case tLET:
+    case tNAMESPACE:
+    case tPACKAGE:
+    case tPRIVATE:
+    case tPROTECTED:
+    case tREADONLY:
+    case tSEALED:
+    case tTHROW:
+    case tTRY:
+    case tTYPEOF:
+    case tUINT8:
+    case tUINT16:
+    case tUINT32:
+    case tUINT64:
+    case tUINTN:
+    case tUNION:
+    case tUSING:
+    case tVAR:
+    case tVARIANT:
+    case tVIRTUAL:
+    case tVOLATILE:
+    case tWITH:
+      return true;
+    default:
+      return false;
+  }
+}
 
 static full_token_t *advance_token_ptr()
 {
@@ -2081,10 +2200,37 @@ int lex(cell *lexvalue,char **lexsym)
   } /* while */
   while (i<=tLAST) {    /* match reserved words and compiler directives */
     if (*lptr==**tokptr && match(*tokptr,TRUE)) {
-      tok->id = i;
-      errorset(sRESET,0); /* reset error flag (clear the "panic mode")*/
-      if (pc_docexpr)   /* optionally concatenate to documentation string */
-        insert_autolist(*tokptr);
+      if (IsUnimplementedKeyword(i)) {
+        // Try to gracefully error.
+        error(173, sc_tokens[i - tFIRST]);
+        tok->id = tSYMBOL;
+        strcpy(tok->str, sc_tokens[i - tFIRST]);
+        tok->len = strlen(tok->str);
+      } else if (*lptr == ':' &&
+                 (i == tINT ||
+                  i == tVOID))
+      {
+        // Special case 'int:' to its old behavior: an implicit view_as<> cast
+        // with Pawn's awful lowercase coercion semantics.
+        const char *token = sc_tokens[i - tFIRST];
+        switch (i) {
+          case tINT:
+            error(238, token, token);
+            break;
+          case tVOID:
+            error(239, token, token);
+            break;
+        }
+        lptr++;
+        tok->id = tLABEL;
+        strcpy(tok->str, token);
+        tok->len = strlen(tok->str);
+      } else {
+        tok->id = i;
+        errorset(sRESET,0); /* reset error flag (clear the "panic mode")*/
+        if (pc_docexpr)   /* optionally concatenate to documentation string */
+          insert_autolist(*tokptr);
+      }
       tok->end.line = fline;
       tok->end.col = (int)(lptr - pline);
       return tok->id;
@@ -2779,25 +2925,6 @@ void delete_symbols(symbol *root,int level,int delete_labels,int delete_function
   constvalue *stateptr;
   int mustdelete;
 
-  // Hack - proxies have a "target" pointer, but the target could be deleted
-  // already if done inside the main loop below. To get around this we do a
-  // precursor pass. Note that proxies can only be at the global scope.
-  if (origRoot == &glbtab) {
-    symbol *iter = root;
-    while (iter->next) {
-      sym = iter->next;
-
-      if (sym->ident != iPROXY) {
-        iter = sym;
-	continue;
-      }
-
-      RemoveFromHashTable(sp_Globals, sym);
-      iter->next = sym->next;
-      free_symbol(sym);
-    }
-  }
-
   /* erase only the symbols with a deeper nesting level than the
    * specified nesting level */
   while (root->next!=NULL) {
@@ -2840,9 +2967,12 @@ void delete_symbols(symbol *root,int level,int delete_labels,int delete_function
       mustdelete=delete_functions || (sym->usage & uNATIVE)!=0;
       assert(sym->parent==NULL);
       break;
-    case iPROXY:
-      // Original loop determined it was okay to keep.
-      mustdelete=FALSE;
+    case iMETHODMAP:
+      // We delete methodmap symbols at the end, but since methodmaps
+      // themselves get wiped, we null the pointer.
+      sym->methodmap = nullptr;
+      mustdelete = delete_functions;
+      assert(!sym->parent);
       break;
     case iARRAYCELL:
     case iARRAYCHAR:
@@ -2998,7 +3128,7 @@ void markusage(symbol *sym,int usage)
  *
  *  Returns a pointer to the global symbol (if found) or NULL (if not found)
  */
-symbol *findglb(const char *name,int filter)
+symbol *findglb(const char *name, int filter)
 {
   /* find a symbol with a matching automaton first */
   symbol *sym=NULL;
@@ -3022,9 +3152,6 @@ symbol *findglb(const char *name,int filter)
    */
   if (sym==NULL)
     sym=FindInHashTable(sp_Globals,name,fcurrent);
-
-  if (sym && sym->ident == iPROXY)
-    return sym->target;
 
   return sym;
 }

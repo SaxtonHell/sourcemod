@@ -387,7 +387,7 @@ SendDialogToOne(client, color, const String:text[], any:...)
 	new String:message[100];
 	VFormat(message, sizeof(message), text, 4);	
 	
-	KeyValues kv = KeyValues("Stuff", "title", message);
+	KeyValues kv = new KeyValues("Stuff", "title", message);
 	kv.SetColor("color", g_Colors[color][0], g_Colors[color][1], g_Colors[color][2], 255);
 	kv.SetNum("level", 1);
 	kv.SetNum("time", 10);
@@ -415,15 +415,15 @@ SendPrivateChat(client, target, const String:message[])
 	LogAction(client, -1, "\"%L\" triggered sm_psay to \"%L\" (text %s)", client, target, message);
 }
 
-SendPanelToAll(from, String:message[])
+void SendPanelToAll(int from, char[] message)
 {
-	decl String:title[100];
+	char title[100];
 	Format(title, 64, "%N:", from);
 	
 	ReplaceString(message, 192, "\\n", "\n");
 	
-	new Handle:mSayPanel = CreatePanel();
-	SetPanelTitle(mSayPanel, title);
+	Panel mSayPanel = CreatePanel();
+	mSayPanel.SetTitle(title);
 	DrawPanelItem(mSayPanel, "", ITEMDRAW_SPACER);
 	DrawPanelText(mSayPanel, message);
 	DrawPanelItem(mSayPanel, "", ITEMDRAW_SPACER);
@@ -439,10 +439,10 @@ SendPanelToAll(from, String:message[])
 		}
 	}
 
-	CloseHandle(mSayPanel);
+	delete mSayPanel;
 }
 
-public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2)
+public Handler_DoNothing(Menu menu, MenuAction action, int param1, int param2)
 {
 	/* Do nothing */
 }

@@ -202,7 +202,7 @@ enum UseType
 	Use_Toggle
 };
 
-union SDKHookCB
+typeset SDKHookCB
 {
 	// PreThink/Post
 	// PostThink/Post
@@ -249,7 +249,7 @@ union SDKHookCB
 	function Action (int entity, int &maxhealth);
 	
 	// OnTakeDamage
-	// OnTakeDamagAlive
+	// OnTakeDamageAlive
 	// Note: The weapon parameter is not used by all games and damage sources.
 	// Note: Force application is dependent on game and damage type(s)
 	// SDKHooks 1.0+

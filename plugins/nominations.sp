@@ -76,7 +76,7 @@ public void OnPluginStart()
 	
 	RegAdminCmd("sm_nominate_addmap", Command_Addmap, ADMFLAG_CHANGEMAP, "sm_nominate_addmap <mapname> - Forces a map to be on the next mapvote.");
 	
-	g_mapTrie = StringMap();
+	g_mapTrie = new StringMap();
 }
 
 public void OnConfigsExecuted()
@@ -85,7 +85,7 @@ public void OnConfigsExecuted()
 					g_mapFileSerial,
 					"nominations",
 					MAPLIST_FLAG_CLEARARRAY|MAPLIST_FLAG_MAPSFOLDER)
-		== INVALID_HANDLE)
+		== null)
 	{
 		if (g_mapFileSerial == -1)
 		{
@@ -257,7 +257,7 @@ void BuildMapMenu()
 	
 	g_mapTrie.Clear();
 	
-	g_MapMenu = Menu(Handler_MapSelectMenu, MENU_ACTIONS_DEFAULT|MenuAction_DrawItem|MenuAction_DisplayItem);
+	g_MapMenu = new Menu(Handler_MapSelectMenu, MENU_ACTIONS_DEFAULT|MenuAction_DrawItem|MenuAction_DisplayItem);
 
 	char map[64];
 	
@@ -266,7 +266,7 @@ void BuildMapMenu()
 	
 	if (g_Cvar_ExcludeOld.BoolValue)
 	{	
-		excludeMaps = ArrayList(ByteCountToCells(33));
+		excludeMaps = new ArrayList(ByteCountToCells(33));
 		GetExcludeMapList(excludeMaps);
 	}
 	

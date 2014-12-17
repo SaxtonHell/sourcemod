@@ -329,10 +329,12 @@ const char *type_to_name(int tag)
     return "float";
   if (tag == pc_tag_string)
     return "char";
+  if (tag == pc_anytag)
+    return "any";
 
   const char *name = pc_tagname(tag);
   if (name)
-    return NULL;
+    return "unknown";
 
   if (tag & FUNCTAG)
     return "function";
@@ -1340,8 +1342,15 @@ static int hier14(value *lval1)
     check_userop(NULL,lval2.tag,lval3.tag,2,&lval3,&lval2.tag);
     store(&lval3);      /* now, store the expression result */
   } /* if */
-  if (!oper && !checktag_string(&lval3, &lval2))
-    matchtag(lval3.tag,lval2.tag,TRUE);
+  if (!oper && !checktag_string(&lval3, &lval2)) {
+    if ((lval3.tag == pc_tag_string && lval2.tag != pc_tag_string) ||
+        (lval3.tag != pc_tag_string && lval2.tag == pc_tag_string))
+    {
+      error(179, type_to_name(lval3.tag), type_to_name(lval2.tag));
+    } else {
+      matchtag(lval3.tag,lval2.tag,TRUE);
+    }
+  }
   if (lval3.sym)
     markusage(lval3.sym,uWRITTEN);
   sideeffect=TRUE;
@@ -1619,6 +1628,74 @@ static int hier2(value *lval)
       lval->constval=-lval->constval;
     } /* if */
     return FALSE;
+  case tNEW:                    /* call nullable methodmap constructor */
+  {
+    tok = lex(&val, &st);
+    if (tok != tSYMBOL)
+      return error(20, st);     /* illegal symbol name */
+
+    symbol *target = NULL;
+    methodmap_t *methodmap = methodmap_find_by_name(st);
+    if (!methodmap)
+      error(116, st);
+    else if (!methodmap->nullable)
+      error(171, methodmap->name);
+    else if (!methodmap->ctor)
+      error(172, methodmap->name);
+    else
+      target = methodmap->ctor->target;
+
+    if (!target) {
+      needtoken('(');
+      int depth = 1;
+      // Eat tokens until we get a newline or EOF or ')' or ';'
+      while (true) {
+        if (peek_same_line() == tEOL)
+          return FALSE;
+        if ((tok = lex(&val, &st)) == 0)
+          return FALSE;
+        if (tok == ')') {
+          if (--depth == 0)
+            return FALSE;
+        }
+        if (tok == ';')
+          return FALSE;
+        if (tok == '(')
+          depth++;
+      }
+    }
+
+    needtoken('(');
+    callfunction(target, NULL, lval, TRUE);
+    return FALSE;
+  }
+  case tVIEW_AS:                /* newer tagname override */
+  {
+    needtoken('<');
+    int tag = 0;
+    {
+      token_t tok;
+      lextok(&tok);
+      if (!parse_new_typename(&tok, &tag))
+        tag = 0;
+    }
+    needtoken('>');
+
+    if (tag == pc_tag_void)
+      error(144);
+
+    lval->cmptag = tag;
+    lvalue = hier12(lval);
+
+    if ((lval->tag & OBJECTTAG) || (tag & OBJECTTAG)) {
+      matchtag(tag, lval->tag, MATCHTAG_COERCE);
+    } else if ((tag & FUNCTAG) != (lval->tag & FUNCTAG)) {
+      // Warn: unsupported cast.
+      error(237);
+    }
+    lval->tag = tag;
+    return lvalue;
+  }
   case tLABEL:                  /* tagname override */
     tag=pc_addtag(st);
     lval->cmptag=tag;
@@ -1933,6 +2010,96 @@ static int hier2(value *lval)
   } /* switch */
 }
 
+static symbol *
+fake_function_for_method(methodmap_t *map, const char *lexstr)
+{
+  // Fetch a fake function so errors aren't as crazy.
+  char tmpname[METHOD_NAMEMAX + 1];
+  strcpy(tmpname, map->name);
+  strcat(tmpname, ".");
+  strcat(tmpname, lexstr);
+  tmpname[sNAMEMAX] = '\0';
+  return fetchfunc(tmpname);
+}
+
+enum FieldExprResult
+{
+  FER_Fail,
+  FER_Accessor,
+  FER_CallFunction,
+  FER_CallMethod
+};
+
+static FieldExprResult
+field_expression(svalue &thisval, value *lval, symbol **target)
+{
+  // Catch invalid calls early so we don't compile with a tag mismatch.
+  switch (thisval.val.ident) {
+    case iARRAY:
+    case iREFARRAY:
+      error(106);
+      break;
+
+    case iFUNCTN:
+    case iREFFUNC:
+      error(107);
+      break;
+  }
+
+  cell lexval;
+  char *lexstr;
+  if (!needtoken(tSYMBOL))
+    return FER_Fail;
+  tokeninfo(&lexval, &lexstr);
+
+  if (thisval.val.ident == iMETHODMAP) {
+    methodmap_t *map = thisval.val.sym->methodmap;
+    methodmap_method_t *method = methodmap_find_method(map, lexstr);
+    if (!method) {
+      error(105, map->name, lexstr);
+      *target = fake_function_for_method(map, lexstr);
+      return FER_CallFunction;
+    }
+
+    if (!method->is_static)
+      error(176, method->name, map->name);
+    *target = method->target;
+    return FER_CallFunction;
+  }
+
+  methodmap_t *map;
+  if ((map = methodmap_find_by_tag(thisval.val.tag)) == NULL) {
+    error(104, pc_tagname(thisval.val.tag));
+    return FER_Fail;
+  }
+
+  methodmap_method_t *method;
+  if ((method = methodmap_find_method(map, lexstr)) == NULL) {
+    error(105, map->name, lexstr);
+    *target = fake_function_for_method(map, lexstr);
+    return FER_CallFunction;
+  }
+
+  if (method && (method->getter || method->setter)) {
+    if (thisval.lvalue)
+      rvalue(lval);
+    clear_value(lval);
+    lval->ident = iACCESSOR;
+    lval->tag = method->property_tag();
+    lval->accessor = method;
+    return FER_Accessor;
+  }
+
+  *target = method->target;
+
+  if (method->is_static) {
+    error(177, method->name, map->name, method->name);
+    return FER_CallFunction;
+  }
+  return FER_CallMethod;
+}
+
+
 /*  hier1
  *
  *  The highest hierarchy level: it looks for pointer and array indices
@@ -1957,14 +2124,27 @@ static int hier1(value *lval1)
   lvalue=primary(lval1);
   symtok=tokeninfo(&val,&st);   /* get token read by primary() */
   cursym=lval1->sym;
+
 restart:
   sym=cursym;
+
+  if (lval1->ident == iMETHODMAP &&
+      !(lexpeek('.') || lexpeek('(')))
+  {
+    // Cannot use methodmap as an rvalue/lvalue.
+    error(174, sym ? sym->name : "(unknown)");
+
+    lval1->ident = iCONSTEXPR;
+    lval1->tag = 0;
+    lval1->constval = 0;
+  }
+
   if (matchtoken('[') || matchtoken('{') || matchtoken('(') || matchtoken('.')) {
+    tok=tokeninfo(&val,&st);    /* get token read by matchtoken() */
     if (lvalue && lval1->ident == iACCESSOR) {
       rvalue(lval1);
       lvalue = FALSE;
     }
-    tok=tokeninfo(&val,&st);    /* get token read by matchtoken() */
     magic_string = (sym && (sym->tag == pc_tag_string && sym->dim.array.level == 0));
     if (sym==NULL && symtok!=tSYMBOL) {
       /* we do not have a valid symbol and we appear not to have read a valid
@@ -2142,59 +2322,17 @@ restart:
 
       svalue *implicitthis = NULL;
       if (tok == '.') {
-        methodmap_t *map;
-
-        /* Catch invalid calls early so we don't compile with a tag mismatch. */
-        switch (thisval.val.ident) {
-          case iARRAY:
-          case iREFARRAY:
-            error(106);
+        switch (field_expression(thisval, lval1, &sym)) {
+          case FER_Fail:
+          case FER_CallFunction:
             break;
-
-          case iFUNCTN:
-          case iREFFUNC:
-            error(107);
-            break;
-        }
-
-        if ((map = methodmap_find_by_tag(thisval.val.tag)) == NULL) {
-          error(104, pc_tagname(thisval.val.tag));
-        }
-        
-        if (needtoken(tSYMBOL) && map) {
-          cell lexval;
-          char *lexstr;
-          methodmap_method_t *method;
-
-          tokeninfo(&lexval, &lexstr);
-          if ((method = methodmap_find_method(map, lexstr)) == NULL)
-            error(105, map->name, lexstr);
-
-          if (method && (method->getter || method->setter)) {
-            if (lvalue)
-              rvalue(lval1);
-            clear_value(lval1);
-            lval1->ident = iACCESSOR;
-            lval1->tag = method->property_tag();
-            lval1->accessor = method;
-            lvalue = TRUE;
-            goto restart;
-          }
-
-          if (!method || !method->target) {
-            error(105, map->name, lexstr);
-
-            // Fetch a fake function so errors aren't as crazy.
-            char tmpname[METHOD_NAMEMAX + 1];
-            strcpy(tmpname, map->name);
-            strcat(tmpname, ".");
-            strcat(tmpname, lexstr);
-            tmpname[sNAMEMAX] = '\0';
-            sym = fetchfunc(tmpname);
-          } else {
+          case FER_CallMethod:
             implicitthis = &thisval;
-            sym = method->target;
-          }
+            break;
+          case FER_Accessor:
+            goto restart;
+          default:
+            assert(false);
         }
 
         // If we don't find a '(' next, just fail to compile for now -- and
@@ -2207,7 +2345,18 @@ restart:
 
       assert(tok=='(');
       if (sym==NULL || (sym->ident!=iFUNCTN && sym->ident!=iREFFUNC)) {
-        if (sym==NULL && sc_status==statFIRST) {
+        if (sym && sym->ident == iMETHODMAP && sym->methodmap) {
+          if (!sym->methodmap->ctor) {
+            // Immediately fatal - no function to call.
+            return error(172, sym->name);
+          }
+          if (sym->methodmap->nullable) {
+            // Keep going, this is basically a style thing.
+            error(170, sym->methodmap->name);
+          }
+
+          sym = sym->methodmap->ctor->target;
+        } else if (sym==NULL && sc_status==statFIRST) {
           /* could be a "use before declaration"; in that case, create a stub
            * function so that the usage can be marked.
            */
@@ -2217,12 +2366,13 @@ restart:
           markusage(sym,uREAD);
         } else {
           return error(12);           /* invalid function call */
-        } /* if */
+        }
       } else if ((sym->usage & uMISSING)!=0) {
         char symname[2*sNAMEMAX+16];  /* allow space for user defined operators */
         funcdisplayname(symname,sym->name);
         error(4,symname);             /* function not defined */
       } /* if */
+
       callfunction(sym,implicitthis,lval1,TRUE);
       if (lexpeek('.')) {
         lvalue = FALSE;
@@ -2345,7 +2495,7 @@ static int primary(value *lval)
       } /* if */
     } /* if */
     /* now try a global variable */
-    if ((sym=findglb(st,sSTATEVAR))!=0) {
+    if ((sym = findglb(st, sSTATEVAR)) != 0) {
       if (sym->ident==iFUNCTN || sym->ident==iREFFUNC) {
         /* if the function is only in the table because it was inserted as a
          * stub in the first pass (i.e. it was "used" but never declared or
@@ -2359,12 +2509,16 @@ static int primary(value *lval)
         lval->sym=sym;
         lval->ident=sym->ident;
         lval->tag=sym->tag;
-        if (sym->ident==iARRAY || sym->ident==iREFARRAY) {
-          address(sym,sPRI);    /* get starting address in primary register */
-          return FALSE;         /* return 0 for array (not lvalue) */
-        } else {
-          return TRUE;          /* return 1 if lvalue (not function or array) */
-        } /* if */
+        switch (sym->ident) {
+          case iARRAY:
+          case iREFARRAY:
+            address(sym,sPRI);    /* get starting address in primary register */
+            return FALSE;         /* return 0 for array (not lvalue) */
+          case iMETHODMAP:
+            return FALSE;
+          default:
+            return TRUE;          /* return 1 if lvalue (not function or array) */
+        } /* switch */
       } /* if */
     } else {
       if (!sc_allowproccall)
@@ -2786,7 +2940,17 @@ static int nesting=0;
             append_constval(&arrayszlst,arg[argidx].name,sym->dim.array.length,level);
           } /* if */
           /* address already in PRI */
+
           checktag(arg[argidx].tags,arg[argidx].numtags,lval.tag);
+
+          if (arg[argidx].numtags > 0) {
+            if ((arg[argidx].tags[0] != pc_tag_string && lval.tag == pc_tag_string) ||
+                (arg[argidx].tags[0] == pc_tag_string && lval.tag != pc_tag_string))
+            {
+              error(178, type_to_name(lval.tag), type_to_name(arg[argidx].tags[0]));
+            }
+          }
+
           if (lval.tag!=0)
             append_constval(&taglst,arg[argidx].name,lval.tag,0);
           // ??? set uWRITTEN?

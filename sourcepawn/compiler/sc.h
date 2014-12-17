@@ -103,6 +103,8 @@ typedef struct s_constvalue {
                          * tag for enumeration lists */
 } constvalue;
 
+struct methodmap_t;
+
 /*  Symbol table format
  *
  *  The symbol name read from the input file is stored in "name", the
@@ -116,7 +118,6 @@ typedef struct s_constvalue {
 typedef struct s_symbol {
   struct s_symbol *next;
   struct s_symbol *parent;  /* hierarchical types */
-  struct s_symbol *target;  /* proxy target */
   char name[sNAMEMAX+1];
   uint32_t hash;        /* value derived from name, for quicker searching */
   cell addr;            /* address or offset (or value for constant, index for native function) */
@@ -151,6 +152,7 @@ typedef struct s_symbol {
   struct s_symbol **refer;  /* referrer list, functions that "use" this symbol */
   int numrefers;        /* number of entries in the referrer list */
   char *documentation;  /* optional documentation string */
+  methodmap_t *methodmap; /* if ident == iMETHODMAP */
 } symbol;
 
 /*  Possible entries for "ident". These are used in the "symbol", "value"
@@ -170,8 +172,8 @@ typedef struct s_symbol {
 #define iFUNCTN     9
 #define iREFFUNC    10
 #define iVARARGS    11  /* function specified ... as argument(s) */
-#define iPROXY      12  /* proxies to another symbol. */
 #define iACCESSOR   13  /* property accessor via a methodmap_method_t */
+#define iMETHODMAP  14  /* symbol defining a methodmap */
 
 /*  Possible entries for "usage"
  *
@@ -392,10 +394,15 @@ enum TokenKind {
   /* value of last multi-character operator */
   tMIDDLE    = tDBLCOLON,
 /* reserved words (statements) */
+  tACQUIRE,
+  tAS,
   tASSERT,
   tBEGIN,
   tBREAK,
+  tBUILTIN,
+  tCATCH,
   tCASE,
+  tCAST_TO,
   tCELLSOF,
   tCHAR,
   tCONST,
@@ -405,27 +412,47 @@ enum TokenKind {
   tDEFINED,
   tDELETE,
   tDO,
+  tDOUBLE,
   tELSE,
   tEND,
   tENUM,
   tEXIT,
+  tEXPLICIT,
+  tFINALLY,
   tFOR,
+  tFOREACH,
   tFORWARD,
   tFUNCENUM,
   tFUNCTAG,
   tFUNCTION,
   tGOTO,
   tIF,
+  tIMPLICIT,
+  tIMPORT,
+  tIN,
   tINT,
+  tINT8,
+  tINT16,
+  tINT32,
+  tINT64,
+  tINTERFACE,
+  tINTN,
+  tLET,
   tMETHODMAP,
+  tNAMESPACE,
   tNATIVE,
   tNEW,
   tNULL,
   tNULLABLE,
   tOBJECT,
   tOPERATOR,
+  tPACKAGE,
+  tPRIVATE,
+  tPROTECTED,
   tPUBLIC,
+  tREADONLY,
   tRETURN,
+  tSEALED,
   tSIZEOF,
   tSLEEP,
   tSTATIC,
@@ -435,10 +462,26 @@ enum TokenKind {
   tTAGOF,
   tTHEN,
   tTHIS,
+  tTHROW,
+  tTRY,
   tTYPEDEF,
+  tTYPEOF,
+  tTYPESET,
+  tUINT8,
+  tUINT16,
+  tUINT32,
+  tUINT64,
+  tUINTN,
   tUNION,
+  tUSING,
+  tVAR,
+  tVARIANT,
+  tVIEW_AS,
+  tVIRTUAL,
   tVOID,
+  tVOLATILE,
   tWHILE,
+  tWITH,
   /* compiler directives */
   tpASSERT,     /* #assert */
   tpDEFINE,
@@ -556,6 +599,7 @@ int pc_enablewarning(int number,int enable);
 const char *pc_tagname(int tag);
 int parse_decl(declinfo_t *decl, int flags);
 const char *type_to_name(int tag);
+bool parse_new_typename(const token_t *tok, int *tagp);
 
 /*
  * Functions called from the compiler (to be implemented by you)
