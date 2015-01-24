@@ -96,7 +96,7 @@ MYSQL *Connect(const DatabaseInfo *info, char *error, size_t maxlength)
 	MYSQL *mysql = mysql_init(NULL);
 	const char *host = NULL, *socket = NULL;
 
-	decltype(info->maxTimeout) timeout = 60;
+	decltype(info->maxTimeout) timeout = 15;
 	if (info->maxTimeout > 0)
 	{
 		timeout = info->maxTimeout;
