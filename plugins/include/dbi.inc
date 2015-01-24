@@ -481,13 +481,13 @@ stock Database SQLite_UseDatabase(const char[] database,
 			  					  char[] error, 
 			  					  maxlength)
 {
-	new Handle kv, Handle db;
+	Handle kv, db;
 
 	kv = CreateKeyValues("");
 	KvSetString(kv, "driver", "sqlite");
 	KvSetString(kv, "database", database);
 
-	db = SQL_ConnectCustom(kv, error, int maxlength, false);
+	db = SQL_ConnectCustom(kv, error, maxlength, false);
 
 	CloseHandle(kv);
 
@@ -646,7 +646,7 @@ stock bool SQL_QuoteString(Handle database,
 						   maxlength,
 						   &written=0)
 {
-	return SQL_EscapeString(database, string, buffer, int maxlength, written);
+	return SQL_EscapeString(database, string, buffer, maxlength, written);
 }
 
 /**

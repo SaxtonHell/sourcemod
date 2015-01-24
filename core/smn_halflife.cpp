@@ -609,6 +609,46 @@ static cell_t GetServerAccountID(IPluginContext *pContext, const cell_t *params)
 #endif
 }
 
+// Must match ClientRangeType enum in halflife.inc
+enum class ClientRangeType : cell_t
+{
+	Visibility = 0,
+	Audibility,
+};
+
+static cell_t GetClientsInRange(IPluginContext *pContext, const cell_t *params)
+{
+	cell_t *origin;
+	pContext->LocalToPhysAddr(params[1], &origin);
+
+	Vector vOrigin(sp_ctof(origin[0]), sp_ctof(origin[1]), sp_ctof(origin[2]));
+
+	ClientRangeType rangeType = (ClientRangeType) params[2];
+
+	CBitVec<ABSOLUTE_PLAYER_LIMIT> players;
+	engine->Message_DetermineMulticastRecipients(rangeType == ClientRangeType::Audibility, vOrigin, players);
+
+	cell_t *outPlayers;
+	pContext->LocalToPhysAddr(params[3], &outPlayers);
+
+	int maxPlayers = params[4];
+	int curPlayers = 0;
+
+	int index = players.FindNextSetBit(0);
+	while (index > -1 && curPlayers < maxPlayers)
+	{
+		int entidx = index + 1;
+		CPlayer *pPlayer = g_Players.GetPlayerByIndex(entidx);
+		if (pPlayer && pPlayer->IsInGame())
+		{
+			outPlayers[curPlayers++] = entidx;
+		}
+
+		index = players.FindNextSetBit(index + 1);
+	}
+
+	return curPlayers;
+}
 
 REGISTER_NATIVES(halflifeNatives)
 {
@@ -647,5 +687,6 @@ REGISTER_NATIVES(halflifeNatives)
 	{"MakeCompatEntRef",		ReferenceToBCompatRef},
 	{"GetServerSteamID",		GetServerSteamID},
 	{"GetServerAccountID",		GetServerAccountID},
+	{"GetClientsInRange",		GetClientsInRange},
 	{NULL,						NULL},
 };
