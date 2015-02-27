@@ -647,11 +647,7 @@ void CPlugin::DependencyDropped(CPlugin *pOwner)
 		if (m_pRuntime->FindNativeByName(entry->name(), &idx) != SP_ERROR_NONE)
 			continue;
 
-		sp_native_t *native;
-		m_pRuntime->GetNativeByIndex(idx, &native);
-
-		native->pfn = NULL;
-		native->status = SP_NATIVE_UNBOUND;
+		m_pRuntime->UpdateNativeBinding(idx, nullptr, 0, nullptr);
 		unbound++;
 	}
 
@@ -932,44 +928,23 @@ LoadRes CPluginManager::_LoadPlugin(CPlugin **aResult, const char *path, bool de
 
 	pPlugin->m_type = PluginType_MapUpdated;
 
-	ICompilation *co = NULL;
-
 	if (pPlugin->m_status == Plugin_Uncompiled)
-	{
-		co = g_pSourcePawn2->StartCompilation();
-	}
-
-	/* Do the actual compiling */
-	if (co != NULL)
 	{
 		char fullpath[PLATFORM_MAX_PATH];
 		g_pSM->BuildPath(Path_SM, fullpath, sizeof(fullpath), "plugins/%s", pPlugin->m_filename);
 
-		pPlugin->m_pRuntime = g_pSourcePawn2->LoadPlugin(co, fullpath, &err);
-		if (pPlugin->m_pRuntime == NULL)
-		{
+		char loadmsg[255];
+		pPlugin->m_pRuntime = g_pSourcePawn2->LoadBinaryFromFile(fullpath, loadmsg, sizeof(loadmsg));
+		if (!pPlugin->m_pRuntime) {
 			if (error)
-			{
-				smcore.Format(error, 
-					maxlength, 
-					"Unable to load plugin (error %d: %s)", 
-					err, 
-					g_pSourcePawn2->GetErrorString(err));
-			}
+				smcore.Format(error, maxlength, "Unable to load plugin (%s)", loadmsg);
 			pPlugin->m_status = Plugin_BadLoad;
-		}
-		else
-		{
-			if (pPlugin->UpdateInfo())
-			{
+		} else {
+			if (pPlugin->UpdateInfo()) {
 				pPlugin->m_status = Plugin_Created;
-			}
-			else
-			{
+			} else {
 				if (error)
-				{
 					smcore.Format(error, maxlength, "%s", pPlugin->m_errormsg);
-				}
 			}
 		}
 	}
@@ -1366,16 +1341,14 @@ bool CPluginManager::RunSecondPass(CPlugin *pPlugin, char *error, size_t maxleng
 	/* Find any unbound natives. Right now, these are not allowed. */
 	IPluginContext *pContext = pPlugin->GetBaseContext();
 	uint32_t num = pContext->GetNativesNum();
-	sp_native_t *native;
 	for (unsigned int i=0; i<num; i++)
 	{
-		if (pContext->GetNativeByIndex(i, &native) != SP_ERROR_NONE)
-		{
+		const sp_native_t *native = pContext->GetRuntime()->GetNative(i);
+		if (!native)
 			break;
-		}
-		if (native->status == SP_NATIVE_UNBOUND
-			&& native->name[0] != '@'
-			&& !(native->flags & SP_NTVFLAG_OPTIONAL))
+		if (native->status == SP_NATIVE_UNBOUND &&
+			native->name[0] != '@' &&
+			!(native->flags & SP_NTVFLAG_OPTIONAL))
 		{
 			if (error)
 			{
@@ -1487,16 +1460,14 @@ void CPluginManager::TryRefreshDependencies(CPlugin *pPlugin)
 	 */
 	IPluginContext *pContext = pPlugin->GetBaseContext();
 	uint32_t num = pContext->GetNativesNum();
-	sp_native_t *native;
 	for (unsigned int i=0; i<num; i++)
 	{
-		if (pContext->GetNativeByIndex(i, &native) != SP_ERROR_NONE)
-		{
+		const sp_native_t *native = pContext->GetRuntime()->GetNative(i);
+		if (!native)
 			break;
-		}
-		if (native->status == SP_NATIVE_UNBOUND
-			&& native->name[0] != '@'
-			&& !(native->flags & SP_NTVFLAG_OPTIONAL))
+		if (native->status == SP_NATIVE_UNBOUND &&
+			native->name[0] != '@' &&
+			!(native->flags & SP_NTVFLAG_OPTIONAL))
 		{
 			pPlugin->SetErrorState(Plugin_Error, "Native not found: %s", native->name);
 			return;

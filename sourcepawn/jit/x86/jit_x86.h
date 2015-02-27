@@ -19,17 +19,19 @@
 
 #include <sp_vm_types.h>
 #include <sp_vm_api.h>
-#include <KeCodeAllocator.h>
 #include <macro-assembler-x86.h>
 #include <am-vector.h>
-#include "jit_shared.h"
-#include "BaseRuntime.h"
-#include "sp_vm_basecontext.h"
-#include "jit_function.h"
+#include "plugin-runtime.h"
+#include "plugin-context.h"
+#include "compiled-function.h"
 #include "opcodes.h"
-#include <am-thread-utils.h>
 
 using namespace SourcePawn;
+
+namespace sp {
+class LegacyImage;
+class Environment;
+class CompiledFunction;
 
 #define JIT_INLINE_ERRORCHECKS  (1<<0)
 #define JIT_INLINE_NATIVES      (1<<1)
@@ -63,42 +65,23 @@ struct CallThunk
   }
 };
 
-class CompData : public ICompilation
-{
-public:
-  CompData() 
-  : profile(0),
-    inline_level(0)
-  {
-  };
-  bool SetOption(const char *key, const char *val);
-  void Abort();
-public:
-  cell_t cur_func;            /* current func pcode offset */
-  /* Options */
-  int profile;                /* profiling flags */
-  int inline_level;           /* inline optimization level */
-  /* Per-compilation properties */
-  unsigned int func_idx;      /* current function index */
-};
-
 class Compiler
 {
  public:
-  Compiler(BaseRuntime *rt, cell_t pcode_offs);
+  Compiler(PluginRuntime *rt, cell_t pcode_offs);
   ~Compiler();
 
-  JitFunction *emit(int *errp);
+  sp::CompiledFunction *emit(int *errp);
 
  private:
   bool setup(cell_t pcode_offs);
-  bool emitOp(OPCODE op);
+  bool emitOp(sp::OPCODE op);
   cell_t readCell();
 
  private:
   Label *labelAt(size_t offset);
   bool emitCall();
-  bool emitNativeCall(OPCODE op);
+  bool emitNativeCall(sp::OPCODE op);
   bool emitSwitch();
   void emitGenArray(bool autozero);
   void emitCallThunks();
@@ -108,27 +91,26 @@ class Compiler
   void emitFloatCmp(ConditionCode cc);
 
   ExternalAddress cipAddr() {
-    sp_context_t *ctx = rt_->GetBaseContext()->GetCtx();
-    return ExternalAddress(&ctx->cip);
+    return ExternalAddress(context_->addressOfCip());
   }
   ExternalAddress hpAddr() {
-    sp_context_t *ctx = rt_->GetBaseContext()->GetCtx();
-    return ExternalAddress(&ctx->hp);
+    return ExternalAddress(context_->addressOfHp());
   }
   ExternalAddress frmAddr() {
-    sp_context_t *ctx = rt_->GetBaseContext()->GetCtx();
-    return ExternalAddress(&ctx->frm);
+    return ExternalAddress(context_->addressOfFrm());
   }
 
  private:
   AssemblerX86 masm;
-  BaseRuntime *rt_;
-  const sp_plugin_t *plugin_;
+  Environment *env_;
+  PluginRuntime *rt_;
+  PluginContext *context_;
+  LegacyImage *image_;
   int error_;
   uint32_t pcode_start_;
-  cell_t *code_start_;
-  cell_t *cip_;
-  cell_t *code_end_;
+  const cell_t *code_start_;
+  const cell_t *cip_;
+  const cell_t *code_end_;
   Label *jump_map_;
   ke::Vector<size_t> backward_jumps_;
 
@@ -146,56 +128,6 @@ class Compiler
   ke::Vector<CallThunk *> thunks_; //:TODO: free
 };
 
-class JITX86
-{
- public:
-  JITX86();
-
- public:
-  bool InitializeJIT();
-  void ShutdownJIT();
-  ICompilation *StartCompilation(BaseRuntime *runtime);
-  ICompilation *StartCompilation();
-  void SetupContextVars(BaseRuntime *runtime, BaseContext *pCtx, sp_context_t *ctx);
-  void FreeContextVars(sp_context_t *ctx);
-  SPVM_NATIVE_FUNC CreateFakeNative(SPVM_FAKENATIVE_FUNC callback, void *pData);
-  void DestroyFakeNative(SPVM_NATIVE_FUNC func);
-  JitFunction *CompileFunction(BaseRuntime *runtime, cell_t pcode_offs, int *err);
-  ICompilation *ApplyOptions(ICompilation *_IN, ICompilation *_OUT);
-  int InvokeFunction(BaseRuntime *runtime, JitFunction *fn, cell_t *result);
-
-  void RegisterRuntime(BaseRuntime *rt);
-  void DeregisterRuntime(BaseRuntime *rt);
-  void PatchAllJumpsForTimeout();
-  void UnpatchAllJumpsFromTimeout();
-  
- public:
-  ExternalAddress GetUniversalReturn() {
-    return ExternalAddress(m_pJitReturn);
-  }
-  void *AllocCode(size_t size);
-  void FreeCode(void *code);
-
-  uintptr_t FrameId() const {
-    return frame_id_;
-  }
-  bool RunningCode() const {
-    return level_ != 0;
-  }
-  ke::Mutex *Mutex() {
-    return &mutex_;
-  }
-
- private:
-  void *m_pJitEntry;         /* Entry function */
-  void *m_pJitReturn;        /* Universal return address */
-  void *m_pJitTimeout;       /* Universal timeout address */
-  ke::InlineList<BaseRuntime> runtimes_;
-  uintptr_t frame_id_;
-  uintptr_t level_;
-  ke::Mutex mutex_;
-};
-
 const Register pri = eax;
 const Register alt = edx;
 const Register stk = edi;
@@ -203,8 +135,10 @@ const Register dat = esi;
 const Register tmp = ecx;
 const Register frm = ebx;
 
-extern Knight::KeCodeCache *g_pCodeCache;
-extern JITX86 g_Jit;
+CompiledFunction *
+CompileFunction(PluginRuntime *prt, cell_t pcode_offs, int *err);
+
+}
 
 #endif //_INCLUDE_SOURCEPAWN_JIT_X86_H_
 

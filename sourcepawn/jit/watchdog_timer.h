@@ -21,12 +21,16 @@
 #include <stdint.h>
 #include <am-thread-utils.h>
 
+namespace sp {
+
+class Environment;
+
 typedef bool (*WatchdogCallback)();
 
 class WatchdogTimer : public ke::IRunnable
 {
  public:
-  WatchdogTimer();
+  WatchdogTimer(Environment *env);
   ~WatchdogTimer();
 
   bool Initialize(size_t timeout_ms);
@@ -41,6 +45,8 @@ class WatchdogTimer : public ke::IRunnable
   void Run();
 
  private:
+  Environment *env_;
+
   bool terminate_;
   size_t timeout_ms_;
   ke::ThreadId mainthread_;
@@ -56,6 +62,6 @@ class WatchdogTimer : public ke::IRunnable
   bool timedout_;
 };
 
-extern WatchdogTimer g_WatchdogTimer;
+} // namespace sp
 
 #endif // _include_sourcepawn_watchdog_timer_posix_h_

@@ -272,7 +272,6 @@ PassRef<Native> ShareSystem::FindNative(const char *name)
 
 void ShareSystem::BindNativesToPlugin(CPlugin *pPlugin, bool bCoreOnly)
 {
-	sp_native_t *native;
 	uint32_t i, native_count;
 	IPluginContext *pContext;
 
@@ -285,7 +284,8 @@ void ShareSystem::BindNativesToPlugin(CPlugin *pPlugin, bool bCoreOnly)
 	native_count = pContext->GetNativesNum();
 	for (i = 0; i < native_count; i++)
 	{
-		if (pContext->GetNativeByIndex(i, &native) != SP_ERROR_NONE)
+		const sp_native_t *native = pContext->GetRuntime()->GetNative(i);
+		if (!native)
 			continue;
 
 		// If we're already bound, no need to do anything else.
@@ -315,8 +315,8 @@ void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, const Ref<Native> &entry)
 	if (pContext->FindNativeByName(entry->name(), &i) != SP_ERROR_NONE)
 		return;
 
-	sp_native_t *native;
-	if (pContext->GetNativeByIndex(i, &native) != SP_ERROR_NONE)
+	const sp_native_t *native = pContext->GetRuntime()->GetNative(i);
+	if (!native)
 		return;
 
 	if (native->status == SP_NATIVE_BOUND)
@@ -325,18 +325,15 @@ void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, const Ref<Native> &entry)
 	BindNativeToPlugin(pPlugin, native, i, entry);
 }
 
-void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, sp_native_t *native, uint32_t index,
+void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, const sp_native_t *native, uint32_t index,
                                      const Ref<Native> &pEntry)
 {
-	/* Mark as bound... we do the rest next. */
-	native->status = SP_NATIVE_BOUND;
-	native->pfn = pEntry->func();
-
+	uint32_t flags = 0;
 	if (pEntry->fake)
 	{
 		/* This native is not necessarily optional, but we don't guarantee
 		 * that its address is long-lived. */
-		native->flags |= SP_NTVFLAG_EPHEMERAL;
+		flags |= SP_NTVFLAG_EPHEMERAL;
 	}
 
 	/* We don't bother with dependency crap if the owner is Core. */
@@ -346,10 +343,9 @@ void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, sp_native_t *native, uint
 		if ((native->flags & SP_NTVFLAG_OPTIONAL) == SP_NTVFLAG_OPTIONAL)
 		{
 			/* Only add if there is a valid owner. */
-			if (pEntry->owner)
-				pEntry->owner->AddWeakRef(WeakNative(pPlugin, index));
-			else
-				native->status = SP_NATIVE_UNBOUND;
+			if (!pEntry->owner)
+				return;
+			pEntry->owner->AddWeakRef(WeakNative(pPlugin, index));
 		}
 		/* Otherwise, we're a strong dependent and not a weak one */
 		else
@@ -368,6 +364,12 @@ void ShareSystem::BindNativeToPlugin(CPlugin *pPlugin, sp_native_t *native, uint
 			}
 		}
 	}
+
+	pPlugin->GetRuntime()->UpdateNativeBinding(
+	  index,
+	  pEntry->func(),
+	  flags,
+	  nullptr);
 }
 
 PassRef<Native> ShareSystem::AddNativeToCache(CNativeOwner *pOwner, const sp_nativeinfo_t *ntv)
@@ -473,9 +475,7 @@ FeatureStatus ShareSystem::TestNative(IPluginRuntime *pRuntime, const char *name
 
 	if (pRuntime->FindNativeByName(name, &index) == SP_ERROR_NONE)
 	{
-		sp_native_t *native;
-		if (pRuntime->GetNativeByIndex(index, &native) == SP_ERROR_NONE)
-		{
+		if (const sp_native_t *native = pRuntime->GetNative(index)) {
 			if (native->status == SP_NATIVE_BOUND)
 				return FeatureStatus_Available;
 			else

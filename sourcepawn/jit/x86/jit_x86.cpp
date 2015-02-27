@@ -33,39 +33,20 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "jit_x86.h"
-#include "../sp_vm_engine.h"
-#include "../engine2.h"
-#include "../BaseRuntime.h"
-#include "../sp_vm_basecontext.h"
+#include "plugin-runtime.h"
+#include "plugin-context.h"
 #include "watchdog_timer.h"
-#include "interpreter.h"
+#include "environment.h"
+#include "code-stubs.h"
+#include "x86-utils.h"
 
 using namespace sp;
-using namespace Knight;
 
 #if defined USE_UNGEN_OPCODES
 #include "ungen_opcodes.h"
 #endif
 
 #define __ masm.
-
-JITX86 g_Jit;
-KeCodeCache *g_pCodeCache = NULL;
-ISourcePawnEngine *engine = &g_engine1;
-
-static inline uint8_t *
-LinkCode(AssemblerX86 &masm)
-{
-  if (masm.outOfMemory())
-    return NULL;
-
-  void *code = Knight::KE_AllocCode(g_pCodeCache, masm.length());
-  if (!code)
-    return NULL;
-
-  masm.emitToExecutableMemory(code);
-  return reinterpret_cast<uint8_t *>(code);
-}
 
 static inline ConditionCode
 OpToCondition(OPCODE op)
@@ -95,129 +76,7 @@ OpToCondition(OPCODE op)
   }
 }
 
-struct array_creation_t
-{
-  const cell_t *dim_list;     /* Dimension sizes */
-  cell_t dim_count;           /* Number of dimensions */
-  cell_t *data_offs;          /* Current offset AFTER the indirection vectors (data) */
-  cell_t *base;               /* array base */
-};
-
-static cell_t
-GenerateInnerArrayIndirectionVectors(array_creation_t *ar, int dim, cell_t cur_offs)
-{
-  cell_t write_offs = cur_offs;
-  cell_t *data_offs = ar->data_offs;
-
-  cur_offs += ar->dim_list[dim];
-
-  // Dimension n-x where x > 2 will have sub-vectors.  
-  // Otherwise, we just need to reference the data section.
-  if (ar->dim_count > 2 && dim < ar->dim_count - 2) {
-    // For each index at this dimension, write offstes to our sub-vectors.
-    // After we write one sub-vector, we generate its sub-vectors recursively.
-    // At the end, we're given the next offset we can use.
-    for (int i = 0; i < ar->dim_list[dim]; i++) {
-      ar->base[write_offs] = (cur_offs - write_offs) * sizeof(cell_t);
-      write_offs++;
-      cur_offs = GenerateInnerArrayIndirectionVectors(ar, dim + 1, cur_offs);
-    }
-  } else {
-    // In this section, there are no sub-vectors, we need to write offsets 
-    // to the data.  This is separate so the data stays in one big chunk.
-    // The data offset will increment by the size of the last dimension, 
-    // because that is where the data is finally computed as. 
-    for (int i = 0; i < ar->dim_list[dim]; i++) {
-      ar->base[write_offs] = (*data_offs - write_offs) * sizeof(cell_t);
-      write_offs++;
-      *data_offs = *data_offs + ar->dim_list[dim + 1];
-    }
-  }
-
-  return cur_offs;
-}
-
-static cell_t
-calc_indirection(const array_creation_t *ar, cell_t dim)
-{
-  cell_t size = ar->dim_list[dim];
-  if (dim < ar->dim_count - 2)
-    size += ar->dim_list[dim] * calc_indirection(ar, dim + 1);
-  return size;
-}
-
-static cell_t
-GenerateArrayIndirectionVectors(cell_t *arraybase, cell_t dims[], cell_t _dimcount, bool autozero)
-{
-  array_creation_t ar;
-  cell_t data_offs;
-
-  /* Reverse the dimensions */
-  cell_t dim_list[sDIMEN_MAX];
-  int cur_dim = 0;
-  for (int i = _dimcount - 1; i >= 0; i--)
-    dim_list[cur_dim++] = dims[i];
-  
-  ar.base = arraybase;
-  ar.dim_list = dim_list;
-  ar.dim_count = _dimcount;
-  ar.data_offs = &data_offs;
-
-  data_offs = calc_indirection(&ar, 0);
-  GenerateInnerArrayIndirectionVectors(&ar, 0, 0);
-  return data_offs;
-}
-
-int
-GenerateFullArray(BaseRuntime *rt, uint32_t argc, cell_t *argv, int autozero)
-{
-  sp_context_t *ctx = rt->GetBaseContext()->GetCtx();
-
-  // Calculate how many cells are needed.
-  if (argv[0] <= 0)
-    return SP_ERROR_ARRAY_TOO_BIG;
-
-  uint32_t cells = argv[0];
-
-  for (uint32_t dim = 1; dim < argc; dim++) {
-    cell_t dimsize = argv[dim];
-    if (dimsize <= 0)
-      return SP_ERROR_ARRAY_TOO_BIG;
-    if (!ke::IsUint32MultiplySafe(cells, dimsize))
-      return SP_ERROR_ARRAY_TOO_BIG;
-    cells *= uint32_t(dimsize);
-    if (!ke::IsUint32AddSafe(cells, dimsize))
-      return SP_ERROR_ARRAY_TOO_BIG;
-    cells += uint32_t(dimsize);
-  }
-
-  if (!ke::IsUint32MultiplySafe(cells, 4))
-    return SP_ERROR_ARRAY_TOO_BIG;
-
-  uint32_t bytes = cells * 4;
-  if (!ke::IsUint32AddSafe(ctx->hp, bytes))
-    return SP_ERROR_ARRAY_TOO_BIG;
-
-  uint32_t new_hp = ctx->hp + bytes;
-  cell_t *dat_hp = reinterpret_cast<cell_t *>(rt->plugin()->memory + new_hp);
-
-  // argv, coincidentally, is STK.
-  if (dat_hp >= argv - STACK_MARGIN)
-    return SP_ERROR_HEAPLOW;
-
-  if (int err = PushTracker(rt->GetBaseContext()->GetCtx(), bytes))
-    return err;
-
-  cell_t *base = reinterpret_cast<cell_t *>(rt->plugin()->memory + ctx->hp);
-  cell_t offs = GenerateArrayIndirectionVectors(base, argv, argc, !!autozero);
-  assert(size_t(offs) == cells);
-
-  argv[argc - 1] = ctx->hp;
-  ctx->hp = new_hp;
-  return SP_ERROR_NONE;
-}
-
-#if !defined NDEBUG
+#if 0 && !defined NDEBUG
 static const char *
 GetFunctionName(const sp_plugin_t *plugin, uint32_t offs)
 {
@@ -271,25 +130,41 @@ GetFunctionName(const sp_plugin_t *plugin, uint32_t offs)
 }
 #endif
 
+CompiledFunction *
+sp::CompileFunction(PluginRuntime *prt, cell_t pcode_offs, int *err)
+{
+  Compiler cc(prt, pcode_offs);
+  CompiledFunction *fun = cc.emit(err);
+  if (!fun)
+    return NULL;
+
+  // Grab the lock before linking code in, since the watchdog timer will look
+  // at this list on another thread.
+  ke::AutoLock lock(Environment::get()->lock());
+
+  prt->AddJittedFunction(fun);
+  return fun;
+}
+
 static int
-CompileFromThunk(BaseRuntime *runtime, cell_t pcode_offs, void **addrp, char *pc)
+CompileFromThunk(PluginRuntime *runtime, cell_t pcode_offs, void **addrp, char *pc)
 {
   // If the watchdog timer has declared a timeout, we must process it now,
   // and possibly refuse to compile, since otherwise we will compile a
   // function that is not patched for timeouts.
-  if (!g_WatchdogTimer.HandleInterrupt())
+  if (!Environment::get()->watchdog()->HandleInterrupt())
     return SP_ERROR_TIMEOUT;
 
-  JitFunction *fn = runtime->GetJittedFunctionByOffset(pcode_offs);
+  CompiledFunction *fn = runtime->GetJittedFunctionByOffset(pcode_offs);
   if (!fn) {
     int err;
-    fn = g_Jit.CompileFunction(runtime, pcode_offs, &err);
+    fn = CompileFunction(runtime, pcode_offs, &err);
     if (!fn)
       return err;
   }
 
 #if defined JIT_SPEW
-  g_engine1.GetDebugHook()->OnDebugSpew(
+  Environment::get()->debugger()->OnDebugSpew(
       "Patching thunk to %s::%s\n",
       runtime->plugin()->name,
       GetFunctionName(runtime->plugin(), pcode_offs));
@@ -302,16 +177,18 @@ CompileFromThunk(BaseRuntime *runtime, cell_t pcode_offs, void **addrp, char *pc
   return SP_ERROR_NONE;
 }
 
-Compiler::Compiler(BaseRuntime *rt, cell_t pcode_offs)
-  : rt_(rt),
-    plugin_(rt->plugin()),
+Compiler::Compiler(PluginRuntime *rt, cell_t pcode_offs)
+  : env_(Environment::get()),
+    rt_(rt),
+    context_(rt->GetBaseContext()),
+    image_(rt_->image()),
     error_(SP_ERROR_NONE),
     pcode_start_(pcode_offs),
-    code_start_(reinterpret_cast<cell_t *>(plugin_->pcode + pcode_start_)),
+    code_start_(reinterpret_cast<const cell_t *>(rt_->code().bytes + pcode_start_)),
     cip_(code_start_),
-    code_end_(reinterpret_cast<cell_t *>(plugin_->pcode + plugin_->pcode_size))
+    code_end_(reinterpret_cast<const cell_t *>(rt_->code().bytes + rt_->code().length))
 {
-  size_t nmaxops = plugin_->pcode_size / sizeof(cell_t) + 1;
+  size_t nmaxops = rt_->code().length / sizeof(cell_t) + 1;
   jump_map_ = new Label[nmaxops];
 }
 
@@ -320,7 +197,7 @@ Compiler::~Compiler()
   delete [] jump_map_;
 }
 
-JitFunction *
+CompiledFunction *
 Compiler::emit(int *errp)
 {
   if (cip_ >= code_end_ || *cip_ != OP_PROC) {
@@ -337,13 +214,13 @@ Compiler::emit(int *errp)
 #if defined JIT_SPEW
   g_engine1.GetDebugHook()->OnDebugSpew(
       "Compiling function %s::%s\n",
-      plugin_->name,
+      rt_->Name(),
       GetFunctionName(plugin_, pcode_start_));
 
   SpewOpcode(plugin_, code_start_, cip_);
 #endif
 
-  cell_t *codeseg = reinterpret_cast<cell_t *>(plugin_->pcode);
+  const cell_t *codeseg = reinterpret_cast<const cell_t *>(rt_->code().bytes);
 
   cip_++;
   if (!emitOp(OP_PROC)) {
@@ -375,19 +252,51 @@ Compiler::emit(int *errp)
   emitCallThunks();
   emitErrorPaths();
 
-  uint8_t *code = LinkCode(masm);
+  uint8_t *code = LinkCode(env_, masm);
   if (!code) {
     *errp = SP_ERROR_OUT_OF_MEMORY;
     return NULL;
   }
 
-  LoopEdge *edges = new LoopEdge[backward_jumps_.length()];
+  AutoPtr<FixedArray<LoopEdge>> edges(
+    new FixedArray<LoopEdge>(backward_jumps_.length()));
   for (size_t i = 0; i < backward_jumps_.length(); i++) {
-    edges[i].offset = backward_jumps_[i];
-    edges[i].disp32 = *reinterpret_cast<int32_t *>(code + edges[i].offset - 4);
+    edges->at(i).offset = backward_jumps_[i];
+    edges->at(i).disp32 = *reinterpret_cast<int32_t *>(code + edges->at(i).offset - 4);
   }
 
-  return new JitFunction(code, pcode_start_, edges, backward_jumps_.length());
+  return new CompiledFunction(code, pcode_start_, edges.take());
+}
+
+// Helpers for invoking context members.
+static int
+InvokePushTracker(PluginContext *cx, uint32_t amount)
+{
+  return cx->pushTracker(amount);
+}
+
+static int
+InvokePopTrackerAndSetHeap(PluginContext *cx)
+{
+  return cx->popTrackerAndSetHeap();
+}
+
+static cell_t
+InvokeNativeHelper(PluginContext *cx, ucell_t native_idx, cell_t *params)
+{
+  return cx->invokeNative(native_idx, params);
+}
+
+static cell_t
+InvokeBoundNativeHelper(PluginContext *cx, SPVM_NATIVE_FUNC fn, cell_t *params)
+{
+  return cx->invokeBoundNative(fn, params);
+}
+
+static int
+InvokeGenerateFullArray(PluginContext *cx, uint32_t argc, cell_t *argv, int autozero)
+{
+  return cx->generateFullArray(argc, argv, autozero);
 }
 
 bool
@@ -1174,7 +1083,7 @@ Compiler::emitOp(OPCODE op)
 
      if (amount > 0) {
        // Check if the stack went beyond the stack top - usually a compiler error.
-       __ cmpl(stk, intptr_t(plugin_->memory + plugin_->mem_size));
+       __ cmpl(stk, intptr_t(context_->memory() + context_->HeapSize()));
        __ j(not_below, &error_stack_min_);
      } else {
        // Check if the stack is going to collide with the heap.
@@ -1193,7 +1102,7 @@ Compiler::emitOp(OPCODE op)
       __ addl(Operand(hpAddr()), amount);
 
       if (amount < 0) {
-        __ cmpl(Operand(hpAddr()), plugin_->data_size);
+        __ cmpl(Operand(hpAddr()), context_->DataSize());
         __ j(below, &error_heap_min_);
       } else {
         __ movl(tmp, Operand(hpAddr()));
@@ -1264,8 +1173,8 @@ Compiler::emitOp(OPCODE op)
       __ push(alt);
 
       __ push(amount * 4);
-      __ push(intptr_t(rt_->GetBaseContext()->GetCtx()));
-      __ call(ExternalAddress((void *)PushTracker));
+      __ push(intptr_t(rt_->GetBaseContext()));
+      __ call(ExternalAddress((void *)InvokePushTracker));
       __ addl(esp, 8);
       __ testl(eax, eax);
       __ j(not_zero, &extern_error_);
@@ -1282,8 +1191,8 @@ Compiler::emitOp(OPCODE op)
       __ push(alt);
 
       // Get the context pointer and call the sanity checker.
-      __ push(intptr_t(rt_));
-      __ call(ExternalAddress((void *)PopTrackerAndSetHeap));
+      __ push(intptr_t(rt_->GetBaseContext()));
+      __ call(ExternalAddress((void *)InvokePopTrackerAndSetHeap));
       __ addl(esp, 4);
       __ testl(eax, eax);
       __ j(not_zero, &extern_error_);
@@ -1295,15 +1204,13 @@ Compiler::emitOp(OPCODE op)
 
     case OP_BREAK:
     {
-      cell_t cip = uintptr_t(cip_ - 1) - uintptr_t(plugin_->pcode);
+      cell_t cip = uintptr_t(cip_ - 1) - uintptr_t(rt_->code().bytes);
       __ movl(Operand(cipAddr()), cip);
       break;
     }
 
     case OP_HALT:
       __ align(16);
-      __ movl(tmp, intptr_t(rt_->GetBaseContext()->GetCtx()));
-      __ movl(Operand(tmp, offsetof(sp_context_t, rval)), pri);
       __ movl(pri, readCell());
       __ jmp(&extern_error_);
       break;
@@ -1368,7 +1275,7 @@ Label *
 Compiler::labelAt(size_t offset)
 {
   if (offset % 4 != 0 ||
-      offset > plugin_->pcode_size ||
+      offset > rt_->code().length ||
       offset <= pcode_start_)
   {
     // If the jump target is misaligned, or out of pcode bounds, or is an
@@ -1386,7 +1293,7 @@ void
 Compiler::emitCheckAddress(Register reg)
 {
   // Check if we're in memory bounds.
-  __ cmpl(reg, plugin_->mem_size);
+  __ cmpl(reg, context_->HeapSize());
   __ j(not_below, &error_memaccess_);
 
   // Check if we're in the invalid region between hp and sp.
@@ -1418,8 +1325,8 @@ Compiler::emitGenArray(bool autozero)
 
     __ shll(tmp, 2);
     __ push(tmp);
-    __ push(intptr_t(rt_->GetBaseContext()->GetCtx()));
-    __ call(ExternalAddress((void *)PushTracker));
+    __ push(intptr_t(rt_->GetBaseContext()));
+    __ call(ExternalAddress((void *)InvokePushTracker));
     __ addl(esp, 4);
     __ pop(tmp);
     __ shrl(tmp, 2);
@@ -1441,12 +1348,12 @@ Compiler::emitGenArray(bool autozero)
   } else {
     __ push(pri);
 
-    // int GenerateArray(sp_plugin_t, vars[], uint32_t, cell_t *, int, unsigned *);
+    // int GenerateArray(cx, vars[], uint32_t, cell_t *, int, unsigned *);
     __ push(autozero ? 1 : 0);
     __ push(stk);
     __ push(val);
-    __ push(intptr_t(rt_));
-    __ call(ExternalAddress((void *)GenerateFullArray));
+    __ push(intptr_t(context_));
+    __ call(ExternalAddress((void *)InvokeGenerateFullArray));
     __ addl(esp, 4 * sizeof(void *));
 
     // restore pri to tmp
@@ -1468,31 +1375,31 @@ Compiler::emitCall()
 
   // If this offset looks crappy, i.e. not aligned or out of bounds, we just
   // abort.
-  if (offset % 4 != 0 || uint32_t(offset) >= plugin_->pcode_size) {
+  if (offset % 4 != 0 || uint32_t(offset) >= rt_->code().length) {
     error_ = SP_ERROR_INSTRUCTION_PARAM;
     return false;
   }
 
   // eax = context
   // ecx = rp
-  __ movl(eax, intptr_t(rt_->GetBaseContext()->GetCtx()));
-  __ movl(ecx, Operand(eax, offsetof(sp_context_t, rp)));
+  __ movl(eax, intptr_t(rt_->GetBaseContext()));
+  __ movl(ecx, Operand(eax, PluginContext::offsetOfRp()));
 
   // Check if the return stack is used up.
   __ cmpl(ecx, SP_MAX_RETURN_STACK);
   __ j(not_below, &error_stack_low_);
 
   // Add to the return stack.
-  uintptr_t cip = uintptr_t(cip_ - 2) - uintptr_t(plugin_->pcode);
-  __ movl(Operand(eax, ecx, ScaleFour, offsetof(sp_context_t, rstk_cips)), cip);
+  uintptr_t cip = uintptr_t(cip_ - 2) - uintptr_t(rt_->code().bytes);
+  __ movl(Operand(eax, ecx, ScaleFour, PluginContext::offsetOfRstkCips()), cip);
 
   // Increment the return stack pointer.
-  __ addl(Operand(eax, offsetof(sp_context_t, rp)), 1);
+  __ addl(Operand(eax, PluginContext::offsetOfRp()), 1);
 
   // Store the CIP of the function we're about to call.
   __ movl(Operand(cipAddr()), offset);
 
-  JitFunction *fun = rt_->GetJittedFunctionByOffset(offset);
+  CompiledFunction *fun = rt_->GetJittedFunctionByOffset(offset);
   if (!fun) {
     // Need to emit a delayed thunk.
     CallThunk *thunk = new CallThunk(offset);
@@ -1508,8 +1415,8 @@ Compiler::emitCall()
   __ movl(Operand(cipAddr()), cip);
 
   // Mark us as leaving the last frame.
-  __ movl(tmp, intptr_t(rt_->GetBaseContext()->GetCtx()));
-  __ subl(Operand(tmp, offsetof(sp_context_t, rp)), 1);
+  __ movl(tmp, intptr_t(rt_->GetBaseContext()));
+  __ subl(Operand(tmp, PluginContext::offsetOfRp()), 1);
   return true;
 }
 
@@ -1548,7 +1455,7 @@ Compiler::emitCallThunks()
 
     __ bind(&error);
     __ movl(Operand(cipAddr()), thunk->pcode_offset);
-    __ jmp(g_Jit.GetUniversalReturn());
+    __ jmp(ExternalAddress(env_->stubs()->ReturnStub()));
   }
 }
 
@@ -1573,7 +1480,7 @@ Compiler::emitNativeCall(OPCODE op)
 {
   uint32_t native_index = readCell();
 
-  if (native_index >= plugin_->num_natives) {
+  if (native_index >= image_->NumNatives()) {
     error_ = SP_ERROR_INSTRUCTION_PARAM;
     return false;
   }
@@ -1600,33 +1507,33 @@ Compiler::emitNativeCall(OPCODE op)
   // Push the last parameter for the C++ function.
   __ push(stk);
 
+  __ movl(eax, intptr_t(rt_->GetBaseContext()));
+  __ movl(Operand(eax, PluginContext::offsetOfLastNative()), native_index);
+
   // Relocate our absolute stk to be dat-relative, and update the context's
   // view.
-  __ movl(eax, intptr_t(rt_->GetBaseContext()->GetCtx()));
   __ subl(stk, dat);
-  __ movl(Operand(eax, offsetof(sp_context_t, sp)), stk);
+  __ movl(Operand(eax, PluginContext::offsetOfSp()), stk);
 
-  __ movl(Operand(eax, offsetof(sp_context_t, n_idx)), native_index);
-
-  sp_native_t *native = rt_->GetNativeByIndex(native_index);
+  const sp_native_t *native = rt_->GetNative(native_index);
   if ((native->status != SP_NATIVE_BOUND) ||
       (native->flags & (SP_NTVFLAG_OPTIONAL | SP_NTVFLAG_EPHEMERAL)))
   {
     // The native is either unbound, or it could become unbound in the
     // future. Invoke the slower native callback.
     __ push(native_index);
-    __ push(eax);
-    __ call(ExternalAddress((void *)NativeCallback));
+    __ push(intptr_t(rt_->GetBaseContext()));
+    __ call(ExternalAddress((void *)InvokeNativeHelper));
   } else {
     // The native is bound so we have a few more guarantees.
     __ push(intptr_t(native->pfn));
-    __ push(eax);
-    __ call(ExternalAddress((void *)BoundNativeCallback));
+    __ push(intptr_t(rt_->GetBaseContext()));
+    __ call(ExternalAddress((void *)InvokeBoundNativeHelper));
   }
 
   // Check for errors.
-  __ movl(ecx, intptr_t(rt_->GetBaseContext()->GetCtx()));
-  __ movl(ecx, Operand(ecx, offsetof(sp_context_t, n_err)));
+  __ movl(ecx, intptr_t(rt_->GetBaseContext()));
+  __ movl(ecx, Operand(ecx, PluginContext::offsetOfNativeError()));
   __ testl(ecx, ecx);
   __ j(not_zero, &extern_error_);
   
@@ -1649,7 +1556,7 @@ Compiler::emitSwitch()
   if (!labelAt(offset))
     return false;
 
-  cell_t *tbl = (cell_t *)((char *)plugin_->pcode + offset + sizeof(cell_t));
+  cell_t *tbl = (cell_t *)((char *)rt_->code().bytes + offset + sizeof(cell_t));
 
   struct Entry {
     cell_t val;
@@ -1749,7 +1656,7 @@ Compiler::emitErrorPath(Label *dest, int code)
   if (dest->used()) {
     __ bind(dest);
     __ movl(eax, code);
-    __ jmp(g_Jit.GetUniversalReturn());
+    __ jmp(ExternalAddress(env_->stubs()->ReturnStub()));
   }
 }
 
@@ -1817,314 +1724,8 @@ Compiler::emitErrorPaths()
 
   if (extern_error_.used()) {
     __ bind(&extern_error_);
-    __ movl(eax, intptr_t(rt_->GetBaseContext()->GetCtx()));
-    __ movl(eax, Operand(eax, offsetof(sp_context_t, n_err)));
-    __ jmp(g_Jit.GetUniversalReturn());
-  }
-}
-
-typedef int (*JIT_EXECUTE)(sp_context_t *ctx, uint8_t *memory, void *code);
-
-static void *
-GenerateEntry(void **retp, void **timeoutp)
-{
-  AssemblerX86 masm;
-
-  __ push(ebp);
-  __ movl(ebp, esp);
-
-  __ push(esi);   // ebp - 4
-  __ push(edi);   // ebp - 8
-  __ push(ebx);   // ebp - 12
-  __ push(esp);   // ebp - 16
-
-  __ movl(ebx, Operand(ebp, 8 + 4 * 0));
-  __ movl(eax, Operand(ebp, 8 + 4 * 1));
-  __ movl(ecx, Operand(ebp, 8 + 4 * 2));
-
-  // Set up run-time registers.
-  __ movl(edi, Operand(ebx, offsetof(sp_context_t, sp)));
-  __ addl(edi, eax);
-  __ movl(esi, eax);
-  __ movl(ebx, edi);
-
-  // Align the stack.
-  __ andl(esp, 0xfffffff0);
-
-  // Call into plugin (align the stack first).
-  __ call(ecx);
-
-  // Get input context, store rval.
-  __ movl(ecx, Operand(ebp, 8 + 4 * 0));
-  __ movl(Operand(ecx, offsetof(sp_context_t, rval)), pri);
-
-  // Set no error.
-  __ movl(eax, SP_ERROR_NONE);
-
-  // Store latest stk. If we have an error code, we'll jump directly to here,
-  // so eax will already be set.
-  Label ret;
-  __ bind(&ret);
-  __ subl(stk, dat);
-  __ movl(Operand(ecx, offsetof(sp_context_t, sp)), stk);
-
-  // Restore stack.
-  __ movl(esp, Operand(ebp, -16));
-
-  // Restore registers and gtfo.
-  __ pop(ebx);
-  __ pop(edi);
-  __ pop(esi);
-  __ pop(ebp);
-  __ ret();
-
-  // The universal emergency return will jump to here.
-  Label error;
-  __ bind(&error);
-  __ movl(ecx, Operand(ebp, 8 + 4 * 0)); // ret-path expects ecx = ctx
-  __ jmp(&ret);
-
-  Label timeout;
-  __ bind(&timeout);
-  __ movl(eax, SP_ERROR_TIMEOUT);
-  __ jmp(&error);
-
-  void *code = LinkCode(masm);
-  if (!code)
-    return NULL;
-
-  *retp = reinterpret_cast<uint8_t *>(code) + error.offset();
-  *timeoutp = reinterpret_cast<uint8_t *>(code) + timeout.offset();
-  return code;
-}
-
-ICompilation *JITX86::ApplyOptions(ICompilation *_IN, ICompilation *_OUT)
-{
-  if (_IN == NULL)
-    return _OUT;
-
-  CompData *_in = (CompData * )_IN;
-  CompData *_out = (CompData * )_OUT;
-
-  _in->inline_level = _out->inline_level;
-  _in->profile = _out->profile;
-
-  _out->Abort();
-  return _in;
-}
-
-JITX86::JITX86()
-{
-  m_pJitEntry = NULL;
-}
-
-bool
-JITX86::InitializeJIT()
-{
-  g_pCodeCache = KE_CreateCodeCache();
-
-  m_pJitEntry = GenerateEntry(&m_pJitReturn, &m_pJitTimeout);
-  if (!m_pJitEntry)
-    return false;
-
-  MacroAssemblerX86 masm;
-  MacroAssemblerX86::GenerateFeatureDetection(masm);
-  void *code = LinkCode(masm);
-  if (!code)
-    return false;
-  MacroAssemblerX86::RunFeatureDetection(code);
-  KE_FreeCode(g_pCodeCache, code);
-
-  return true;
-}
-
-void
-JITX86::ShutdownJIT()
-{
-  KE_DestroyCodeCache(g_pCodeCache);
-}
-
-JitFunction *
-JITX86::CompileFunction(BaseRuntime *prt, cell_t pcode_offs, int *err)
-{
-  Compiler cc(prt, pcode_offs);
-  JitFunction *fun = cc.emit(err);
-  if (!fun)
-    return NULL;
-
-  // Grab the lock before linking code in, since the watchdog timer will look
-  // at this list on another thread.
-  ke::AutoLock lock(g_Jit.Mutex());
-
-  prt->AddJittedFunction(fun);
-  return fun;
-}
-
-void
-JITX86::SetupContextVars(BaseRuntime *runtime, BaseContext *pCtx, sp_context_t *ctx)
-{
-  ctx->tracker = new tracker_t;
-  ctx->tracker->pBase = (ucell_t *)malloc(1024);
-  ctx->tracker->pCur = ctx->tracker->pBase;
-  ctx->tracker->size = 1024 / sizeof(cell_t);
-  ctx->basecx = pCtx;
-  ctx->plugin = const_cast<sp_plugin_t *>(runtime->plugin());
-}
-
-SPVM_NATIVE_FUNC
-JITX86::CreateFakeNative(SPVM_FAKENATIVE_FUNC callback, void *pData)
-{
-  AssemblerX86 masm;
-
-  __ push(ebx);
-  __ push(edi);
-  __ push(esi);
-  __ movl(edi, Operand(esp, 16)); // store ctx
-  __ movl(esi, Operand(esp, 20)); // store params
-  __ movl(ebx, esp);
-  __ andl(esp, 0xfffffff0);
-  __ subl(esp, 4);
-
-  __ push(intptr_t(pData));
-  __ push(esi);
-  __ push(edi);
-  __ call(ExternalAddress((void *)callback));
-  __ movl(esp, ebx);
-  __ pop(esi);
-  __ pop(edi);
-  __ pop(ebx);
-  __ ret();
-
-  return (SPVM_NATIVE_FUNC)LinkCode(masm);
-}
-
-void
-JITX86::DestroyFakeNative(SPVM_NATIVE_FUNC func)
-{
-  KE_FreeCode(g_pCodeCache, (void *)func);
-}
-
-ICompilation *
-JITX86::StartCompilation()
-{
-  return new CompData;
-}
-
-ICompilation *
-JITX86::StartCompilation(BaseRuntime *runtime)
-{
-  return new CompData;
-}
-
-void
-CompData::Abort()
-{
-  delete this;
-}
-
-void
-JITX86::FreeContextVars(sp_context_t *ctx)
-{
-  free(ctx->tracker->pBase);
-  delete ctx->tracker;
-}
-
-bool
-CompData::SetOption(const char *key, const char *val)
-{
-  if (strcmp(key, SP_JITCONF_DEBUG) == 0)
-    return true;
-  if (strcmp(key, SP_JITCONF_PROFILE) == 0) {
-    profile = atoi(val);
-
-    /** Callbacks must be profiled to profile functions! */
-    if ((profile & SP_PROF_FUNCTIONS) == SP_PROF_FUNCTIONS)
-      profile |= SP_PROF_CALLBACKS;
-
-    return true;
-  }
-
-  return false;
-}
-
-int
-JITX86::InvokeFunction(BaseRuntime *runtime, JitFunction *fn, cell_t *result)
-{
-  sp_context_t *ctx = runtime->GetBaseContext()->GetCtx();
-
-  // Note that cip, hp, sp are saved and restored by Execute2().
-  ctx->cip = fn->GetPCodeAddress();
-
-  JIT_EXECUTE pfn = (JIT_EXECUTE)m_pJitEntry;
-
-  if (level_++ == 0)
-    frame_id_++;
-  int err = pfn(ctx, runtime->plugin()->memory, fn->GetEntryAddress());
-  level_--;
-
-  *result = ctx->rval;
-  return err;
-}
-
-void *
-JITX86::AllocCode(size_t size)
-{
-  return Knight::KE_AllocCode(g_pCodeCache, size);
-}
-
-void
-JITX86::FreeCode(void *code)
-{
-  KE_FreeCode(g_pCodeCache, code);
-}
-
-void
-JITX86::RegisterRuntime(BaseRuntime *rt)
-{
-  mutex_.AssertCurrentThreadOwns();
-  runtimes_.append(rt);
-}
-
-void
-JITX86::DeregisterRuntime(BaseRuntime *rt)
-{
-  mutex_.AssertCurrentThreadOwns();
-  runtimes_.remove(rt);
-}
-
-void
-JITX86::PatchAllJumpsForTimeout()
-{
-  mutex_.AssertCurrentThreadOwns();
-  for (ke::InlineList<BaseRuntime>::iterator iter = runtimes_.begin(); iter != runtimes_.end(); iter++) {
-    BaseRuntime *rt = *iter;
-    for (size_t i = 0; i < rt->NumJitFunctions(); i++) {
-      JitFunction *fun = rt->GetJitFunction(i);
-      uint8_t *base = reinterpret_cast<uint8_t *>(fun->GetEntryAddress());
-
-      for (size_t j = 0; j < fun->NumLoopEdges(); j++) {
-        const LoopEdge &e = fun->GetLoopEdge(j);
-        int32_t diff = intptr_t(m_pJitTimeout) - intptr_t(base + e.offset);
-        *reinterpret_cast<int32_t *>(base + e.offset - 4) = diff;
-      }
-    }
-  }
-}
-
-void
-JITX86::UnpatchAllJumpsFromTimeout()
-{
-  mutex_.AssertCurrentThreadOwns();
-  for (ke::InlineList<BaseRuntime>::iterator iter = runtimes_.begin(); iter != runtimes_.end(); iter++) {
-    BaseRuntime *rt = *iter;
-    for (size_t i = 0; i < rt->NumJitFunctions(); i++) {
-      JitFunction *fun = rt->GetJitFunction(i);
-      uint8_t *base = reinterpret_cast<uint8_t *>(fun->GetEntryAddress());
-
-      for (size_t j = 0; j < fun->NumLoopEdges(); j++) {
-        const LoopEdge &e = fun->GetLoopEdge(j);
-        *reinterpret_cast<int32_t *>(base + e.offset - 4) = e.disp32;
-      }
-    }
+    __ movl(eax, intptr_t(rt_->GetBaseContext()));
+    __ movl(eax, Operand(eax, PluginContext::offsetOfNativeError()));
+    __ jmp(ExternalAddress(env_->stubs()->ReturnStub()));
   }
 }
