@@ -386,3 +386,8 @@ SourcePawnEngine2::SetProfilingTool(IProfilingTool *tool)
 {
   Environment::get()->SetProfiler(tool);
 }
+
+void SourcePawnEngine2::FreeContextTrace(IContextTrace *trace)
+{
+  delete trace;
+}

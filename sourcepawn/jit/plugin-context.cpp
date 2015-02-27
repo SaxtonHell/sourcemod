@@ -20,6 +20,7 @@
 #include "x86/jit_x86.h"
 #include "environment.h"
 #include "compiled-function.h"
+#include "debug-trace.h"
 
 using namespace sp;
 using namespace SourcePawn;
@@ -711,6 +712,12 @@ void
 PluginContext::ClearLastNativeError()
 {
   native_error_ = SP_ERROR_NONE;
+}
+
+IContextTrace *
+PluginContext::GetContextTrace()
+{
+  return new CContextTrace(m_pRuntime, SP_ERROR_NONE, NULL, 0);
 }
 
 int

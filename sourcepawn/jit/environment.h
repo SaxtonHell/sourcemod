@@ -17,12 +17,14 @@
 #include <am-utility.h> // Replace with am-cxx later.
 #include <am-inlinelist.h>
 #include <am-thread-utils.h>
+#include <IProfileToolManager.h>
 #include "code-allocator.h"
 #include "plugin-runtime.h"
 
 namespace sp {
 
 using namespace SourcePawn;
+using namespace SourceMod;
 
 class PluginRuntime;
 class CodeStubs;

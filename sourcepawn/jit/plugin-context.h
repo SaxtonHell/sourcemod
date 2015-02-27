@@ -88,6 +88,7 @@ class PluginContext : public IPluginContext
   bool GetKey(int k, void **value);
   void Refresh();
   void ClearLastNativeError();
+  IContextTrace *GetContextTrace();
 
   size_t HeapSize() const {
     return mem_size_;
