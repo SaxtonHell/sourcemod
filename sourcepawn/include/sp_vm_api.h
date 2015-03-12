@@ -935,6 +935,15 @@ namespace SourcePawn
 		 */
 
 		/**
+		 * @brief Report a fatal error. Fatal errors cannot be caught by any
+ 		 * exception handler.
+ 		 *
+		 * @param message      Error message format.
+		 * @param ...          Formatting arguments.
+		 */
+		virtual void ReportFatalError(const char *fmt, ...) = 0;
+
+		/**
 		 * @brief Report a fatal error with variadic arguments. Fatal errors
 		 * cannot be caught by any exception handler.
 		 *
