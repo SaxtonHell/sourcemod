@@ -1176,13 +1176,9 @@ bool CPluginManager::FindOrRequirePluginDeps(CPlugin *pPlugin, char *error, size
 				if ((pFunc=pBase->GetFunctionByName(buffer)))
 				{
 					cell_t res;
-					pFunc->Execute(&res);
-					if (pPlugin->GetBaseContext()->GetLastNativeError() != SP_ERROR_NONE)
-					{
+					if (pFunc->Execute(&res) != SP_ERROR_NONE) {
 						if (error)
-						{
 							smcore.Format(error, maxlength, "Fatal error during initializing plugin load");
-						}
 						return false;
 					}
 				}
@@ -1304,13 +1300,9 @@ bool CPluginManager::LoadOrRequireExtensions(CPlugin *pPlugin, unsigned int pass
 					if ((pFunc = pBase->GetFunctionByName(buffer)) != NULL)
 					{
 						cell_t res;
-						pFunc->Execute(&res);
-						if (pPlugin->GetBaseContext()->GetLastNativeError() != SP_ERROR_NONE)
-						{
+						if (pFunc->Execute(&res) != SP_ERROR_NONE) {
 							if (error)
-							{
 								smcore.Format(error, maxlength, "Fatal error during plugin initialization (ext req)");
-							}
 							return false;
 						}
 					}

@@ -325,8 +325,8 @@ class SMConfig(object):
       os.path.join(context.currentSourcePath, 'sdk'),
       os.path.join(builder.sourcePath, 'public'),
       os.path.join(builder.sourcePath, 'public', 'extensions'),
-      os.path.join(builder.sourcePath, 'public', 'sourcepawn'),
-      os.path.join(builder.sourcePath, 'public', 'amtl'),
+      os.path.join(builder.sourcePath, 'sourcepawn', 'include'),
+      os.path.join(builder.sourcePath, 'public', 'amtl', 'include'),
     ]
     return compiler
 
@@ -509,7 +509,7 @@ BuildScripts = [
   'extensions/topmenus/AMBuilder',
   'extensions/updater/AMBuilder',
   'sourcepawn/compiler/AMBuilder',
-  'sourcepawn/jit/AMBuilder',
+  'sourcepawn/vm/AMBuilder',
 ]
 
 if builder.backend == 'amb2':

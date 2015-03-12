@@ -993,7 +993,6 @@ void AdminCache::DumpAdminCache(AdminCachePart part, bool rebuild)
 
 	List<IAdminListener *>::iterator iter;
 	IAdminListener *pListener;
-	cell_t result;
 
 	if (part == AdminCache_Overrides)
 	{
@@ -1007,7 +1006,7 @@ void AdminCache::DumpAdminCache(AdminCachePart part, bool rebuild)
 				pListener->OnRebuildOverrideCache();
 			}
 			m_pCacheFwd->PushCell(part);
-			m_pCacheFwd->Execute(&result);
+			m_pCacheFwd->Execute();
 		}
 	} else if (part == AdminCache_Groups || part == AdminCache_Admins) {
 		if (part == AdminCache_Groups)
@@ -1021,7 +1020,7 @@ void AdminCache::DumpAdminCache(AdminCachePart part, bool rebuild)
 					pListener->OnRebuildGroupCache();
 				}
 				m_pCacheFwd->PushCell(part);
-				m_pCacheFwd->Execute(&result);
+				m_pCacheFwd->Execute();
 			}
 		}
 		InvalidateAdminCache(true);
@@ -1033,7 +1032,7 @@ void AdminCache::DumpAdminCache(AdminCachePart part, bool rebuild)
 				pListener->OnRebuildAdminCache((part == AdminCache_Groups));
 			}
 			m_pCacheFwd->PushCell(AdminCache_Admins);
-			m_pCacheFwd->Execute(&result);
+			m_pCacheFwd->Execute();
 			playerhelpers->RecheckAnyAdmins();
 		}
 	}

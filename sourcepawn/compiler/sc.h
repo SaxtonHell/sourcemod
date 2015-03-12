@@ -149,6 +149,7 @@ typedef struct s_symbol {
   int numrefers;        /* number of entries in the referrer list */
   char *documentation;  /* optional documentation string */
   methodmap_t *methodmap; /* if ident == iMETHODMAP */
+  int funcid;           /* set for functions during codegen */
 } symbol;
 
 /*  Possible entries for "ident". These are used in the "symbol", "value"
@@ -565,12 +566,12 @@ typedef enum s_optmark {
 
 #define suSLEEP_INSTR 0x01      /* the "sleep" instruction was used */
 
-#define FIXEDTAG     0x40000000Lu
-#define FUNCTAG      0x20000000Lu
-#define OBJECTTAG    0x10000000Lu
-#define ENUMTAG      0x08000000Lu
-#define METHODMAPTAG 0x04000000Lu
-#define STRUCTTAG    0x02000000Lu
+#define FIXEDTAG     0x40000000
+#define FUNCTAG      0x20000000
+#define OBJECTTAG    0x10000000
+#define ENUMTAG      0x08000000
+#define METHODMAPTAG 0x04000000
+#define STRUCTTAG    0x02000000
 #define TAGTYPEMASK   (FUNCTAG | OBJECTTAG | ENUMTAG | METHODMAPTAG | STRUCTTAG)
 #define TAGFLAGMASK   (FIXEDTAG | TAGTYPEMASK)
 #define TAGID(tag)    ((tag) & ~(TAGFLAGMASK))
@@ -757,6 +758,7 @@ void invoke_setter(struct methodmap_method_s *method, int save);
 void inc_pri();
 void dec_pri();
 void load_hidden_arg();
+void load_glbfn(symbol *sym);
 
 /*  Code generation functions for arithmetic operators.
  *
@@ -981,7 +983,7 @@ typedef struct array_info_s
 } array_info_t;
 
 enum FatalError {
-  FIRST_FATAL_ERROR = 180,
+  FIRST_FATAL_ERROR = 183,
 
   FATAL_ERROR_READ  = FIRST_FATAL_ERROR,
   FATAL_ERROR_WRITE,

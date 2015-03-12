@@ -43,13 +43,13 @@
   #pragma warning(disable:4125)  /* decimal digit terminates octal escape sequence */
 #endif
 
-#include <sc5.scp>
+#include "sc5-in.scp"
 
 #if defined _MSC_VER
   #pragma warning(pop)
 #endif
 
-#define NUM_WARNINGS    (sizeof warnmsg / sizeof warnmsg[0])
+#define NUM_WARNINGS    (int)(sizeof warnmsg / sizeof warnmsg[0])
 static unsigned char warndisable[(NUM_WARNINGS + 7) / 8]; /* 8 flags in a char */
 
 static int errflag;

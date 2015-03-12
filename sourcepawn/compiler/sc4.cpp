@@ -365,7 +365,8 @@ void alignframe(int numbytes)
 {
   #if !defined NDEBUG
     /* "numbytes" should be a power of 2 for this code to work */
-    int i,count=0;
+    size_t i;
+    int count=0;
     for (i=0; i<sizeof numbytes*8; i++)
       if (numbytes & (1 << i))
         count++;
@@ -1501,4 +1502,18 @@ void invoke_setter(methodmap_method_t *method, int save)
 
   if (sc_status != statSKIP)
     markusage(method->setter, uREAD);
+}
+
+// function value -> pri
+void load_glbfn(symbol *sym)
+{
+  assert(sym->ident == iFUNCTN);
+  assert(!(sym->usage & uNATIVE));
+  stgwrite("\tldgfn.pri ");
+  stgwrite(sym->name);
+  stgwrite("\n");
+  code_idx += opcodes(1) + opargs(1);
+
+  if (sc_status != statSKIP)
+    markusage(sym, uREAD);
 }
