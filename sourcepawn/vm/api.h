@@ -67,7 +67,6 @@ class SourcePawnEngine2 : public ISourcePawnEngine2
   void EnableProfiling() KE_OVERRIDE;
   void DisableProfiling() KE_OVERRIDE;
   void SetProfilingTool(IProfilingTool *tool) KE_OVERRIDE;
-  void FreeContextTrace(IContextTrace *trace) KE_OVERRIDE;
   IPluginRuntime *LoadBinaryFromFile(const char *file, char *error, size_t maxlength) KE_OVERRIDE;
   ISourcePawnEnvironment *Environment() KE_OVERRIDE;
 };

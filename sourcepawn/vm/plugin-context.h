@@ -91,7 +91,6 @@ class PluginContext : public IPluginContext
   bool GetKey(int k, void **value);
   void Refresh();
   void ClearLastNativeError();
-  IContextTrace *GetContextTrace();
   ISourcePawnEngine2 *APIv2() KE_OVERRIDE;
   void ReportError(const char *fmt, ...) KE_OVERRIDE;
   void ReportErrorVA(const char *fmt, va_list ap) KE_OVERRIDE;

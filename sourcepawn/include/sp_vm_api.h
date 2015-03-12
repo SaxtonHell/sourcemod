@@ -901,11 +901,6 @@ namespace SourcePawn
 		 * is deprecated and should not be used.
 		 */
 		virtual void ClearLastNativeError() =0;
-
-		/**
-		 * @brief Returns a context trace representing the current execution state.
-		*/
-		virtual IContextTrace *GetContextTrace() =0;
 		
 		/**
 		 * @brief Return a pointer to the ISourcePawnEngine2 that is active.
@@ -1369,13 +1364,6 @@ namespace SourcePawn
 		 * @param tool      Profiling tool.
 		 */
 		virtual void SetProfilingTool(SourceMod::IProfilingTool *tool) =0;
-
-		/**
-		 * @brief Frees a context trace that was returned from a plugin context.
-		 *
-		 * @param context	Context trace.
-		*/
-		virtual void FreeContextTrace(IContextTrace *trace) =0;
 
 		/**
 		 * @brief Loads a plugin from disk.
