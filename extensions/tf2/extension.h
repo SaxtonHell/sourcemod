@@ -2,7 +2,7 @@
  * vim: set ts=4 :
  * =============================================================================
  * SourceMod Team Fortress 2 Extension
- * Copyright (C) 2004-2015 AlliedModders LLC.  All rights reserved.
+ * Copyright (C) 2004-2011 AlliedModders LLC.  All rights reserved.
  * =============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -55,7 +55,8 @@ class TF2Tools :
 	public ICommandTargetProcessor,
 	public IConCommandBaseAccessor,
 	public IGameEventListener2,
-	public IPluginsListener
+	public IPluginsListener,
+	public IClientListener
 {
 public: //SDKExtension
 	/**
@@ -103,6 +104,8 @@ public: //IGameEventManager
 public: //IPluginsListener
 	void OnPluginLoaded(IPlugin *plugin);
 	void OnPluginUnloaded(IPlugin *plugin);
+public: //IClientListener
+	void OnClientPutInServer(int client);
 public:
 #if defined SMEXT_CONF_METAMOD
 	/**
