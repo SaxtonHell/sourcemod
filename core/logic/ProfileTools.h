@@ -54,7 +54,7 @@ public:
 	void OnRootConsoleCommand2(const char *cmdname, const ICommandArgs *args) KE_OVERRIDE;
 
 	// IProfileToolManager
-	void RegisterTool(IProfilingTool *tool) {
+	void RegisterTool(SourcePawn::IProfilingTool *tool) {
 		tools_.append(tool);
 	}
 
@@ -74,15 +74,15 @@ public:
 			active_->LeaveScope();
 	}
 
-	IProfilingTool *FindToolByName(const char *name);
+	SourcePawn::IProfilingTool *FindToolByName(const char *name);
 
 private:
-	void StartFromConsole(IProfilingTool *tool);
+	void StartFromConsole(SourcePawn::IProfilingTool *tool);
 
 private:
-	ke::Vector<IProfilingTool *> tools_;
-	IProfilingTool *active_;
-	IProfilingTool *default_;
+	ke::Vector<SourcePawn::IProfilingTool *> tools_;
+	SourcePawn::IProfilingTool *active_;
+	SourcePawn::IProfilingTool *default_;
 	bool enabled_;
 };
 
