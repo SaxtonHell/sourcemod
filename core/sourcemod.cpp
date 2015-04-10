@@ -173,9 +173,6 @@ bool SourceModBase::InitializeSourceMod(char *error, size_t maxlength, bool late
 		return false;
 	}
 
-	/* Initialize CoreConfig to get the SourceMod base path properly - this parses core.cfg */
-	g_CoreConfig.Initialize();
-
 	/* There will always be a path by this point, since it was force-set above. */
 	m_GotBasePath = true;
 
@@ -256,6 +253,9 @@ void SourceModBase::StartSourceMod(bool late)
 	gamedllPatch = SH_GET_CALLCLASS(gamedll);
 
 	InitLogicBridge();
+
+	/* Initialize CoreConfig to get the SourceMod base path properly - this parses core.cfg */
+	g_CoreConfig.Initialize();
 
 	/* Notify! */
 	SMGlobalClass *pBase = SMGlobalClass::head;
