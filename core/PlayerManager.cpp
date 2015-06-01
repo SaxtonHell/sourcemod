@@ -129,7 +129,7 @@ public:
 PlayerManager::PlayerManager()
 {
 	m_AuthQueue = NULL;
-	m_FirstPass = false;
+	m_bServerActivated = false;
 	m_maxClients = 0;
 
 	m_SourceTVUserId = -1;
@@ -147,6 +147,19 @@ PlayerManager::~PlayerManager()
 
 	delete [] m_AuthQueue;
 	delete [] m_UserIdLookUp;
+}
+
+void PlayerManager::OnSourceModStartup(bool late)
+{
+	/* Initialize all players */
+
+	m_PlayerCount = 0;
+	m_Players = new CPlayer[SM_MAXPLAYERS + 1];
+	m_AuthQueue = new unsigned int[SM_MAXPLAYERS + 1];
+
+	memset(m_AuthQueue, 0, sizeof(unsigned int) * (SM_MAXPLAYERS + 1));
+
+	g_NumPlayersToAuth = &m_AuthQueue[0];
 }
 
 void PlayerManager::OnSourceModAllInitialized()
@@ -286,9 +299,6 @@ void PlayerManager::OnServerActivate(edict_t *pEdictList, int edictCount, int cl
 	static ConVar *replay_enable = icvar->FindVar("replay_enable");
 #endif
 
-	// clientMax will not necessarily be correct here (such as on late SourceTV enable)
-	m_maxClients = gpGlobals->maxClients;
-
 	ICommandLine *commandLine = g_HL2.GetValveCommandLine();
 	m_bIsSourceTVActive = (tv_enable && tv_enable->GetBool() && (!commandLine || commandLine->FindParm("-nohltv") == 0));
 	m_bIsReplayActive = false;
@@ -297,23 +307,8 @@ void PlayerManager::OnServerActivate(edict_t *pEdictList, int edictCount, int cl
 #endif
 	m_PlayersSinceActive = 0;
 	
-	if (!m_FirstPass)
-	{
-		/* Initialize all players */
-
-		m_PlayerCount = 0;
-		m_Players = new CPlayer[SM_MAXPLAYERS + 1];
-		m_AuthQueue = new unsigned int[SM_MAXPLAYERS + 1];
-		m_FirstPass = true;
-
-		memset(m_AuthQueue, 0, sizeof(unsigned int) * (SM_MAXPLAYERS + 1));
-
-		g_NumPlayersToAuth = &m_AuthQueue[0];
-	}
-
-	scripts->SyncMaxClients(m_maxClients);
-
 	g_OnMapStarted = true;
+	m_bServerActivated = true;
 
 #if SOURCE_ENGINE == SE_DOTA
 	extsys->CallOnCoreMapStart(gpGlobals->pEdicts, gpGlobals->maxEntities, gpGlobals->maxClients);
@@ -345,7 +340,7 @@ void PlayerManager::OnServerActivate(edict_t *pEdictList, int edictCount, int cl
 
 bool PlayerManager::IsServerActivated()
 {
-	return m_FirstPass;
+	return m_bServerActivated;
 }
 
 bool PlayerManager::CheckSetAdmin(int index, CPlayer *pPlayer, AdminId id)
@@ -1677,11 +1672,6 @@ void PlayerManager::OnSourceModMaxPlayersChanged( int newvalue )
 
 void PlayerManager::MaxPlayersChanged( int newvalue /*= -1*/ )
 {
-	if (!m_FirstPass)
-	{
-		return;
-	}
-
 	if (newvalue == -1)
 	{
 		newvalue = gpGlobals->maxClients;

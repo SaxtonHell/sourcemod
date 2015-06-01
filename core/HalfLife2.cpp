@@ -60,7 +60,8 @@ typedef ICommandLine *(*FakeGetCommandLine)();
 #define VSTDLIB_NAME		"libvstdlib.dylib"
 #elif defined __linux__
 #if SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_TF2 \
-	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_LEFT4DEAD2 || SOURCE_ENGINE == SE_NUCLEARDAWN
+	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_LEFT4DEAD2 || SOURCE_ENGINE == SE_NUCLEARDAWN \
+	|| SOURCE_ENGINE == SE_BMS
 #define TIER0_NAME			"libtier0_srv.so"
 #define VSTDLIB_NAME		"libvstdlib_srv.so"
 #elif SOURCE_ENGINE >= SE_LEFT4DEAD
@@ -154,11 +155,12 @@ void CHalfLife2::OnSourceModAllInitialized_Post()
 
 void CHalfLife2::InitLogicalEntData()
 {
-#if SOURCE_ENGINE == SE_TF2      \
-	|| SOURCE_ENGINE == SE_DODS  \
-	|| SOURCE_ENGINE == SE_HL2DM \
-	|| SOURCE_ENGINE == SE_CSS   \
-	|| SOURCE_ENGINE == SE_SDK2013
+#if SOURCE_ENGINE == SE_TF2        \
+	|| SOURCE_ENGINE == SE_DODS    \
+	|| SOURCE_ENGINE == SE_HL2DM   \
+	|| SOURCE_ENGINE == SE_CSS     \
+	|| SOURCE_ENGINE == SE_SDK2013 \
+	|| SOURCE_ENGINE == SE_BMS
 
 	if (g_SMAPI->GetServerFactory(false)("VSERVERTOOLS003", nullptr))
 	{
@@ -509,7 +511,7 @@ bool CHalfLife2::TextMsg(int client, int dest, const char *msg)
 		/* Use SayText user message instead */
 		if (chat_saytext != NULL && strcmp(chat_saytext, "yes") == 0)
 		{
-			char buffer[192];
+			char buffer[253];
 			UTIL_Format(buffer, sizeof(buffer), "%s\1\n", msg);
 
 #if SOURCE_ENGINE == SE_DOTA
