@@ -426,7 +426,7 @@ static cell_t IsCharAlpha(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 
-	return isalpha(chr);
+	return isalpha(chr) == 0 ? 0 : 1;
 }
 
 static cell_t IsCharNumeric(IPluginContext *pContext, const cell_t *params)
@@ -438,7 +438,7 @@ static cell_t IsCharNumeric(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 
-	return isdigit(chr);
+	return isdigit(chr) == 0 ? 0 : 1;
 }
 
 static cell_t IsCharSpace(IPluginContext *pContext, const cell_t *params)
@@ -450,7 +450,7 @@ static cell_t IsCharSpace(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 
-	return isspace(chr);
+	return isspace(chr) == 0 ? 0 : 1;
 }
 
 static cell_t IsCharMB(IPluginContext *pContext, const cell_t *params)
@@ -475,7 +475,7 @@ static cell_t IsCharUpper(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 
-	return isupper(chr);
+	return isupper(chr) == 0 ? 0 : 1;
 }
 
 static cell_t IsCharLower(IPluginContext *pContext, const cell_t *params)
@@ -487,7 +487,7 @@ static cell_t IsCharLower(IPluginContext *pContext, const cell_t *params)
 		return 0;
 	}
 
-	return islower(chr);
+	return islower(chr) == 0 ? 0 : 1;
 }
 
 static cell_t ReplaceString(IPluginContext *pContext, const cell_t *params)
