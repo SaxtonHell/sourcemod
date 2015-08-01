@@ -97,12 +97,12 @@ int g_mapFileSerial = -1;
 
 MapChange g_ChangeTime;
 
-new Handle:g_MapVoteTimerInitializedForward = null;
+Handle g_MapVoteTimerInitializedForward = null;
 Handle g_NominationsResetForward = null;
 Handle g_MapVoteStartedForward = null;
-new Handle:g_MapVoteItemSelectedForward = null;
-new Handle:g_MapVoteItemDisplayedForward = null;
-new Handle:g_MapVoteFinishedForward = null;
+Handle g_MapVoteItemSelectedForward = null;
+Handle g_MapVoteItemDisplayedForward = null;
+Handle g_MapVoteFinishedForward = null;
 
 /* Upper bound of how many team there could be */
 #define MAXTEAMS 10
@@ -585,17 +585,17 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 	Call_StartForward(g_MapVoteStartedForward);
 	Call_Finish();
 
-	new numSpacers = GetConVarInt(g_Cvar_NumSpacers);
+	int numSpacers = GetConVarInt(g_Cvar_NumSpacers);
 
-	if (GetConVarInt(g_Cvar_SpacerMode) == 1)
+	if (g_Cvar_SpacerMode.IntValue == 1)
 	{
 		// random spacer mode is enabled
 		numSpacers = GetRandomInt(0, numSpacers);
 	}
 
-	for (new i = 0; i < numSpacers; ++i)
+	for (int i = 0; i < numSpacers; ++i)
 	{
-		AddMenuItem(g_VoteMenu, MAPCHOOSER_VOTE_SPACER, "");
+		g_VoteMenu.AddItem(MAPCHOOSER_VOTE_SPACER, "");
 	}
 	
 	/**
@@ -610,7 +610,7 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 	/* No input given - User our internal nominations and maplist */
 	if (inputlist == null)
 	{
-		Handle mapsToAdd = CreateArray(ByteCountToCells(PLATFORM_MAX_PATH));
+		ArrayList mapsToAdd = CreateArray(ByteCountToCells(PLATFORM_MAX_PATH));
 
 		int nominateCount = g_NominateList.Length;
 		int voteSize = g_Cvar_IncludeMaps.IntValue;
@@ -662,7 +662,7 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 			count++;
 			
 			/* Insert the map and increment our count */
-			PushArrayString(mapsToAdd, map);
+			mapsToAdd.PushString(map);
 			i++;
 		}
 
@@ -672,10 +672,10 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 			SortADTArray(mapsToAdd, Sort_Random, Sort_String);
 		}
 
-		for (new x = 0; x < GetArraySize(mapsToAdd); ++x)
+		for (int x = 0; x < mapsToAdd.Length; ++x)
 		{
 			// finally add the maps we want to the vote menu
-			GetArrayString(mapsToAdd, x, map, sizeof(map));
+			mapsToAdd.GetString(x, map, sizeof(map));
 			g_VoteMenu.AddItem(map, map);
 		}
 		
@@ -1063,14 +1063,14 @@ bool RemoveStringFromArray(ArrayList array, char[] str)
 	return false;
 }
 
-Float:GetMapChangeTime()
+float GetMapChangeTime()
 {
-	new Float:changeTime = 2.0;
+	float changeTime = 2.0;
 
-	if (g_Cvar_Bonusroundtime != INVALID_HANDLE)
+	if (g_Cvar_Bonusroundtime != null)
 	{
 		// this mod supports specifying time between rounds, so we can use it to change the map at the end of the in-between time
-		changeTime = GetConVarFloat(g_Cvar_Bonusroundtime) - 1.0;
+		changeTime = g_Cvar_Bonusroundtime.FloatValue - 1.0;
 
 		if (changeTime < 0.0)
 			changeTime = 2.0;
@@ -1079,9 +1079,9 @@ Float:GetMapChangeTime()
 	return changeTime;
 }
 
-Float:GetIntermissionDelay()
+float GetIntermissionDelay()
 {
-	return GetConVarFloat(g_Cvar_IntermissionDelay);
+	return g_Cvar_IntermissionDelay.FloatValue;
 }
 
 
@@ -1180,9 +1180,9 @@ NominateResult InternalNominateMap(char[] map, bool force, int owner)
 	return Nominate_Added;
 }
 
-FreezePlayers()
+void FreezePlayers()
 {
-	for (new i = 1; i <= MaxClients; ++i)
+	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if (IsClientInGame(i))
 		{
@@ -1191,9 +1191,9 @@ FreezePlayers()
 	}
 }
 
-public Action:Timer_ShowScores(Handle:hTimer)
+public Action Timer_ShowScores(Handle hTimer)
 {
-	for (new i = 1; i <= MaxClients; ++i)
+	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if (IsClientInGame(i))
 		{
@@ -1202,9 +1202,9 @@ public Action:Timer_ShowScores(Handle:hTimer)
 	}
 }
 
-ShowViewPortPanel(client, const String:name[])
+void ShowViewPortPanel(int client, const char[] name)
 {
-	new Handle:msg = StartMessageOne("VGUIMenu", client);
+	Handle msg = StartMessageOne("VGUIMenu", client);
 	BfWriteString(msg, name);
 	BfWriteByte(msg, 1);
 	BfWriteByte(msg, 0);
