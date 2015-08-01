@@ -2,7 +2,7 @@
  * vim: set ts=4 sw=4 tw=99 noet :
  * =============================================================================
  * SourceMod
- * Copyright (C) 2004-2009 AlliedModders LLC.  All rights reserved.
+ * Copyright (C) 2004-2015 AlliedModders LLC.  All rights reserved.
  * =============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -47,6 +47,7 @@
 #include "logic_bridge.h"
 #include "sm_profiletool.h"
 #include <sourcemod_version.h>
+#include "smn_keyvalues.h"
 
 PlayerManager g_Players;
 bool g_OnMapStarted = false;
@@ -57,6 +58,8 @@ IForward *PostAdminFilter = NULL;
 const unsigned int *g_NumPlayersToAuth = NULL;
 int lifestate_offset = -1;
 List<ICommandTargetProcessor *> target_processors;
+
+ConVar sm_debug_connect("sm_debug_connect", "0", 0, "Log Debug information about potential connection issues.");
 
 #if SOURCE_ENGINE == SE_DOTA
 SH_DECL_HOOK5(IServerGameClients, ClientConnect, SH_NOATTRIB, 0, bool, CEntityIndex, const char *, const char *, char *, int);
@@ -75,6 +78,9 @@ SH_DECL_HOOK1_void(IServerGameClients, ClientCommand, SH_NOATTRIB, 0, edict_t *)
 #endif
 SH_DECL_HOOK1_void(IServerGameClients, ClientSettingsChanged, SH_NOATTRIB, 0, edict_t *);
 #endif // SE_DOTA
+#if SOURCE_ENGINE >= SE_EYE && SOURCE_ENGINE != SE_DOTA
+SH_DECL_HOOK2_void(IServerGameClients, ClientCommandKeyValues, SH_NOATTRIB, 0, edict_t *, KeyValues *);
+#endif
 
 #if SOURCE_ENGINE == SE_DOTA
 SH_DECL_HOOK0_void(IServerGameDLL, ServerActivate, SH_NOATTRIB, 0);
@@ -135,6 +141,7 @@ PlayerManager::PlayerManager()
 	m_SourceTVUserId = -1;
 	m_ReplayUserId = -1;
 
+	m_bInCCKVHook = false;
 	m_bAuthstringValidation = true; // use steam auth by default
 
 	m_UserIdLookUp = new int[USHRT_MAX+1];
@@ -170,6 +177,10 @@ void PlayerManager::OnSourceModAllInitialized()
 	SH_ADD_HOOK(IServerGameClients, ClientDisconnect, serverClients, SH_MEMBER(this, &PlayerManager::OnClientDisconnect), false);
 	SH_ADD_HOOK(IServerGameClients, ClientDisconnect, serverClients, SH_MEMBER(this, &PlayerManager::OnClientDisconnect_Post), true);
 	SH_ADD_HOOK(IServerGameClients, ClientCommand, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommand), false);
+#if SOURCE_ENGINE >= SE_EYE && SOURCE_ENGINE != SE_DOTA
+	SH_ADD_HOOK(IServerGameClients, ClientCommandKeyValues, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommandKeyValues), false);
+	SH_ADD_HOOK(IServerGameClients, ClientCommandKeyValues, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommandKeyValues_Post), true);
+#endif
 	SH_ADD_HOOK(IServerGameClients, ClientSettingsChanged, serverClients, SH_MEMBER(this, &PlayerManager::OnClientSettingsChanged), true);
 	SH_ADD_HOOK(IServerGameDLL, ServerActivate, gamedll, SH_MEMBER(this, &PlayerManager::OnServerActivate), true);
 #if SOURCE_ENGINE >= SE_LEFT4DEAD && SOURCE_ENGINE != SE_DOTA
@@ -189,6 +200,8 @@ void PlayerManager::OnSourceModAllInitialized()
 	m_cldisconnect = forwardsys->CreateForward("OnClientDisconnect", ET_Ignore, 1, p2);
 	m_cldisconnect_post = forwardsys->CreateForward("OnClientDisconnect_Post", ET_Ignore, 1, p2);
 	m_clcommand = forwardsys->CreateForward("OnClientCommand", ET_Hook, 2, NULL, Param_Cell, Param_Cell);
+	m_clcommandkv = forwardsys->CreateForward("OnClientCommandKeyValues", ET_Hook, 2, NULL, Param_Cell, Param_Cell);
+	m_clcommandkv_post = forwardsys->CreateForward("OnClientCommandKeyValues_Post", ET_Ignore, 2, NULL, Param_Cell, Param_Cell);
 	m_clinfochanged = forwardsys->CreateForward("OnClientSettingsChanged", ET_Ignore, 1, p2);
 	m_clauth = forwardsys->CreateForward("OnClientAuthorized", ET_Ignore, 2, NULL, Param_Cell, Param_String);
 	m_onActivate = forwardsys->CreateForward("OnServerLoad", ET_Ignore, 0, NULL);
@@ -217,6 +230,10 @@ void PlayerManager::OnSourceModShutdown()
 	SH_REMOVE_HOOK(IServerGameClients, ClientDisconnect, serverClients, SH_MEMBER(this, &PlayerManager::OnClientDisconnect), false);
 	SH_REMOVE_HOOK(IServerGameClients, ClientDisconnect, serverClients, SH_MEMBER(this, &PlayerManager::OnClientDisconnect_Post), true);
 	SH_REMOVE_HOOK(IServerGameClients, ClientCommand, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommand), false);
+#if SOURCE_ENGINE >= SE_EYE && SOURCE_ENGINE != SE_DOTA
+	SH_REMOVE_HOOK(IServerGameClients, ClientCommandKeyValues, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommandKeyValues), false);
+	SH_REMOVE_HOOK(IServerGameClients, ClientCommandKeyValues, serverClients, SH_MEMBER(this, &PlayerManager::OnClientCommandKeyValues_Post), true);
+#endif
 	SH_REMOVE_HOOK(IServerGameClients, ClientSettingsChanged, serverClients, SH_MEMBER(this, &PlayerManager::OnClientSettingsChanged), true);
 	SH_REMOVE_HOOK(IServerGameDLL, ServerActivate, gamedll, SH_MEMBER(this, &PlayerManager::OnServerActivate), true);
 #if SOURCE_ENGINE >= SE_LEFT4DEAD && SOURCE_ENGINE != SE_DOTA
@@ -232,6 +249,8 @@ void PlayerManager::OnSourceModShutdown()
 	forwardsys->ReleaseForward(m_cldisconnect);
 	forwardsys->ReleaseForward(m_cldisconnect_post);
 	forwardsys->ReleaseForward(m_clcommand);
+	forwardsys->ReleaseForward(m_clcommandkv);
+	forwardsys->ReleaseForward(m_clcommandkv_post);
 	forwardsys->ReleaseForward(m_clinfochanged);
 	forwardsys->ReleaseForward(m_clauth);
 	forwardsys->ReleaseForward(m_onActivate);
@@ -497,6 +516,28 @@ bool PlayerManager::OnClientConnect(edict_t *pEntity, const char *pszName, const
 
 	CPlayer *pPlayer = &m_Players[client];
 	++m_PlayersSinceActive;
+
+	if (pPlayer->IsConnected())
+	{
+		if (sm_debug_connect.GetBool())
+		{
+			const char *pAuth = pPlayer->GetAuthString(false);
+			if (pAuth == NULL)
+			{
+				pAuth = "";
+			}
+
+			logger->LogMessage("\"%s<%d><%s><>\" was already connected to the server.", pPlayer->GetName(), pPlayer->GetUserId(), pAuth);
+		}
+
+#if SOURCE_ENGINE == SE_DOTA
+		OnClientDisconnect(pPlayer->GetIndex(), 0);
+		OnClientDisconnect_Post(pPlayer->GetIndex(), 0);
+#else
+		OnClientDisconnect(pPlayer->GetEdict());
+		OnClientDisconnect_Post(pPlayer->GetEdict());
+#endif
+	}
 
 	pPlayer->Initialize(pszName, pszAddress, pEntity);
 	
@@ -1041,6 +1082,86 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 		RETURN_META(MRES_SUPERCEDE);
 	}
 }
+
+#if SOURCE_ENGINE >= SE_EYE && SOURCE_ENGINE != SE_DOTA
+static bool s_LastCCKVAllowed = true;
+
+void PlayerManager::OnClientCommandKeyValues(edict_t *pEntity, KeyValues *pCommand)
+{
+	int client = IndexOfEdict(pEntity);
+
+	cell_t res = Pl_Continue;
+	CPlayer *pPlayer = &m_Players[client];
+
+	if (!pPlayer->IsInGame())
+	{
+		RETURN_META(MRES_IGNORED);
+	}
+
+	KeyValueStack *pStk = new KeyValueStack;
+	pStk->pBase = pCommand;
+	pStk->pCurRoot.push(pStk->pBase);
+	pStk->m_bDeleteOnDestroy = false;
+
+	Handle_t hndl = handlesys->CreateHandle(g_KeyValueType, pStk, g_pCoreIdent, g_pCoreIdent, NULL);
+
+	m_bInCCKVHook = true;
+	m_clcommandkv->PushCell(client);
+	m_clcommandkv->PushCell(hndl);
+	m_clcommandkv->Execute(&res);
+	m_bInCCKVHook = false;
+
+	HandleSecurity sec(g_pCoreIdent, g_pCoreIdent);
+
+	// Deletes pStk
+	handlesys->FreeHandle(hndl, &sec);
+
+	if (res >= Pl_Handled)
+	{
+		s_LastCCKVAllowed = false;
+		RETURN_META(MRES_SUPERCEDE);
+	}
+
+	s_LastCCKVAllowed = true;
+
+	RETURN_META(MRES_IGNORED);
+}
+
+void PlayerManager::OnClientCommandKeyValues_Post(edict_t *pEntity, KeyValues *pCommand)
+{
+	if (!s_LastCCKVAllowed)
+	{
+		return;
+	}
+
+	int client = IndexOfEdict(pEntity);
+
+	CPlayer *pPlayer = &m_Players[client];
+
+	if (!pPlayer->IsInGame())
+	{
+		return;
+	}
+
+	KeyValueStack *pStk = new KeyValueStack;
+	pStk->pBase = pCommand;
+	pStk->pCurRoot.push(pStk->pBase);
+	pStk->m_bDeleteOnDestroy = false;
+
+	Handle_t hndl = handlesys->CreateHandle(g_KeyValueType, pStk, g_pCoreIdent, g_pCoreIdent, NULL);
+
+	m_bInCCKVHook = true;
+	m_clcommandkv_post->PushCell(client);
+	m_clcommandkv_post->PushCell(hndl);
+	m_clcommandkv_post->Execute();
+	m_bInCCKVHook = false;
+
+	HandleSecurity sec(g_pCoreIdent, g_pCoreIdent);
+
+	// Deletes pStk
+	handlesys->FreeHandle(hndl, &sec);
+}
+#endif
 
 #if SOURCE_ENGINE == SE_DOTA
 void PlayerManager::OnClientSettingsChanged(CEntityIndex index)
