@@ -34,11 +34,8 @@
 #include "sourcemm_api.h"
 #include "sm_globals.h"
 #include "sm_autonatives.h"
-#include "logic/intercom.h"
-#include "LibrarySys.h"
 #include "sm_stringutil.h"
 #include "Logger.h"
-#include "sm_srvcmds.h"
 #include "TimerSys.h"
 #include "logic_bridge.h"
 #include "PlayerManager.h"
@@ -47,50 +44,54 @@
 #include "CoreConfig.h"
 #include "ConCmdManager.h"
 #include "IDBDriver.h"
+#include "provider.h"
 #if SOURCE_ENGINE == SE_DOTA
-#include "convar_sm_dota.h"
+# include "convar_sm_dota.h"
 #elif SOURCE_ENGINE >= SE_ALIENSWARM
-#include "convar_sm_swarm.h"
+# include "convar_sm_swarm.h"
 #elif SOURCE_ENGINE >= SE_LEFT4DEAD
-#include "convar_sm_l4d.h"
+# include "convar_sm_l4d.h"
 #elif SOURCE_ENGINE >= SE_ORANGEBOX
-#include "convar_sm_ob.h"
+# include "convar_sm_ob.h"
 #else
-#include "convar_sm.h"
+# include "convar_sm.h"
 #endif
+#include <amtl/os/am-shared-library.h>
+#include <amtl/os/am-path.h>
+#include <bridge/include/IVEngineServerBridge.h>
+#include <bridge/include/IPlayerInfoBridge.h>
+#include <bridge/include/IFileSystemBridge.h>
 
 #if defined _WIN32
-	#define MATCHMAKINGDS_SUFFIX	""
-	#define MATCHMAKINGDS_EXT	"dll"
+# define MATCHMAKINGDS_SUFFIX	""
+# define MATCHMAKINGDS_EXT	"dll"
 #elif defined __APPLE__
-	#define MATCHMAKINGDS_SUFFIX	""
-	#define MATCHMAKINGDS_EXT	"dylib"
+# define MATCHMAKINGDS_SUFFIX	""
+# define MATCHMAKINGDS_EXT	"dylib"
 #elif defined __linux__
 #if SOURCE_ENGINE < SE_LEFT4DEAD2
-	#define MATCHMAKINGDS_SUFFIX	"_i486"
+# define MATCHMAKINGDS_SUFFIX	"_i486"
 #else
-	#define MATCHMAKINGDS_SUFFIX	""
+# define MATCHMAKINGDS_SUFFIX	""
 #endif
-	#define MATCHMAKINGDS_EXT	"so"
+# define MATCHMAKINGDS_EXT	"so"
 #endif
 
-static ILibrary *g_pLogic = NULL;
-static LogicInitFunction logic_init_fn;
-
-IThreader *g_pThreader;
-ITextParsers *textparsers;
 sm_logic_t logicore;
-ITranslator *translator;
-IScriptManager *scripts;
-IShareSys *sharesys;
-IExtensionSys *extsys;
-IHandleSys *handlesys;
-IForwardManager *forwardsys;
-IAdminSystem *adminsys;
-IProfileToolManager *profiletool;
-ILogger *logger;
 
-class VEngineServer_Logic : public IVEngineServer_Logic
+IThreader *g_pThreader = nullptr;
+ITextParsers *textparsers = nullptr;
+ITranslator *translator = nullptr;
+IScriptManager *scripts = nullptr;
+IShareSys *sharesys = nullptr;
+IExtensionSys *extsys = nullptr;
+IHandleSys *handlesys = nullptr;
+IForwardManager *forwardsys = nullptr;
+IAdminSystem *adminsys = nullptr;
+ILogger *logger = nullptr;
+IRootConsole *rootmenu = nullptr;
+
+class VEngineServer_Logic : public IVEngineServerBridge
 {
 public:
 	virtual bool IsDedicatedServer()
@@ -129,12 +130,9 @@ public:
 		serverpluginhelpers->ClientCommand(pEdict, szCommand);
 #endif
 	}
-};
+} engine_wrapper;
 
-static VEngineServer_Logic logic_engine;
-
-
-class VFileSystem_Logic : public IFileSystem_Logic
+class VFileSystem_Logic : public IFileSystemBridge
 {
 public:
 	const char *FindFirstEx(const char *pWildCard, const char *pPathID, FileFindHandle_t *pHandle)
@@ -221,11 +219,9 @@ public:
 	{
 		filesystem->CreateDirHierarchy(path, pathID);
 	}
-};
+} fs_wrapper;
 
-static VFileSystem_Logic logic_filesystem;
-
-class VPlayerInfo_Logic : public IPlayerInfo_Logic
+class VPlayerInfo_Logic : public IPlayerInfoBridge
 {
 public:
 	bool IsObserver(IPlayerInfo *pInfo)
@@ -292,158 +288,26 @@ public:
 	{
 		pInfo->ChangeTeam(iTeamNum);
 	}
-};
-
-static VPlayerInfo_Logic logic_playerinfo;
+} playerinfo_wrapper;
 
 static ConVar sm_show_activity("sm_show_activity", "13", FCVAR_SPONLY, "Activity display setting (see sourcemod.cfg)");
 static ConVar sm_immunity_mode("sm_immunity_mode", "1", FCVAR_SPONLY, "Mode for deciding immunity protection");
 static ConVar sm_datetime_format("sm_datetime_format", "%m/%d/%Y - %H:%M:%S", 0, "Default formatting time rules");
-
-static ConVar *find_convar(const char *name)
-{
-	return icvar->FindVar(name);
-}
-
-static void log_to_game(const char *message)
-{
-	Engine_LogPrintWrapper(message);
-}
-
-static void conprint(const char *message)
-{
-	META_CONPRINT(message);
-}
-
-static const char *get_cvar_string(ConVar* cvar)
-{
-	return cvar->GetString();
-}
-
-static bool get_cvar_bool(ConVar* cvar)
-{
-	return cvar->GetBool();
-}
-
-static bool get_game_name(char *buffer, size_t maxlength)
-{
-	KeyValues *pGameInfo = new KeyValues("GameInfo");
-	if (g_HL2.KVLoadFromFile(pGameInfo, basefilesystem, "gameinfo.txt"))
-	{
-		const char *str;
-		if ((str = pGameInfo->GetString("game", NULL)) != NULL)
-		{
-			strncopy(buffer, str, maxlength);
-			pGameInfo->deleteThis();
-			return true;
-		}
-	}
-	pGameInfo->deleteThis();
-	return false;
-}
-
-static const char *get_game_description()
-{
-	return SERVER_CALL(GetGameDescription)();
-}
-
-static const char *get_source_engine_name()
-{
-#if !defined SOURCE_ENGINE
-# error "Unknown engine type"
-#endif
-#if SOURCE_ENGINE == SE_EPISODEONE
-	return "original";
-#elif SOURCE_ENGINE == SE_DARKMESSIAH
-	return "darkmessiah";
-#elif SOURCE_ENGINE == SE_ORANGEBOX
-	return "orangebox";
-#elif SOURCE_ENGINE == SE_BLOODYGOODTIME
-	return "bloodygoodtime";
-#elif SOURCE_ENGINE == SE_EYE
-	return "eye";
-#elif SOURCE_ENGINE == SE_CSS
-	return "css";
-#elif SOURCE_ENGINE == SE_HL2DM
-	return "hl2dm";
-#elif SOURCE_ENGINE == SE_DODS
-	return "dods";
-#elif SOURCE_ENGINE == SE_SDK2013
-	return "sdk2013";
-#elif SOURCE_ENGINE == SE_BMS
-	return "bms";
-#elif SOURCE_ENGINE == SE_TF2
-	return "tf2";
-#elif SOURCE_ENGINE == SE_LEFT4DEAD
-	return "left4dead";
-#elif SOURCE_ENGINE == SE_NUCLEARDAWN
-	return "nucleardawn";
-#elif SOURCE_ENGINE == SE_CONTAGION
-	return "contagion";
-#elif SOURCE_ENGINE == SE_LEFT4DEAD2
-	return "left4dead2";
-#elif SOURCE_ENGINE == SE_ALIENSWARM
-	return "alienswarm";
-#elif SOURCE_ENGINE == SE_PORTAL2
-	return "portal2";
-#elif SOURCE_ENGINE == SE_BLADE
-	return "blade";
-#elif SOURCE_ENGINE == SE_INSURGENCY
-	return "insurgency";
-#elif SOURCE_ENGINE == SE_CSGO
-	return "csgo";
-#elif SOURCE_ENGINE == SE_DOTA
-	return "dota";
-#endif
-}
-
-static bool symbols_are_hidden()
-{
-#if (SOURCE_ENGINE == SE_CSS)            \
-	|| (SOURCE_ENGINE == SE_HL2DM)       \
-	|| (SOURCE_ENGINE == SE_DODS)        \
-	|| (SOURCE_ENGINE == SE_SDK2013)     \
-	|| (SOURCE_ENGINE == SE_BMS)         \
-	|| (SOURCE_ENGINE == SE_TF2)         \
-	|| (SOURCE_ENGINE == SE_LEFT4DEAD)   \
-	|| (SOURCE_ENGINE == SE_NUCLEARDAWN) \
-	|| (SOURCE_ENGINE == SE_LEFT4DEAD2)  \
-	|| (SOURCE_ENGINE == SE_INSURGENCY)  \
-	|| (SOURCE_ENGINE == SE_BLADE)       \
-	|| (SOURCE_ENGINE == SE_CSGO)        \
-	|| (SOURCE_ENGINE == SE_DOTA)
-	return true;
-#else
-	return false;
-#endif
-}
 
 static const char* get_core_config_value(const char* key)
 {
 	return g_CoreConfig.GetCoreConfigValue(key);
 }
 
-static bool is_map_loading()
+static void keyvalues_to_dbinfo(KeyValues *kv, DatabaseInfo *out)
 {
-	return g_SourceMod.IsMapLoading();
-}
-
-static bool is_map_running()
-{
-	return g_SourceMod.IsMapRunning();
-}
-
-static DatabaseInfo keyvalues_to_dbinfo(KeyValues *kv)
-{
-	DatabaseInfo info;
-	info.database = kv->GetString("database", "");
-	info.driver = kv->GetString("driver", "default");
-	info.host = kv->GetString("host", "");
-	info.maxTimeout = kv->GetInt("timeout", 0);
-	info.pass = kv->GetString("pass", "");
-	info.port = kv->GetInt("port", 0);
-	info.user = kv->GetString("user", "");
-	return info;
+	out->database = kv->GetString("database", "");
+	out->driver = kv->GetString("driver", "default");
+	out->host = kv->GetString("host", "");
+	out->maxTimeout = kv->GetInt("timeout", 0);
+	out->pass = kv->GetString("pass", "");
+	out->port = kv->GetInt("port", 0);
+	out->user = kv->GetString("user", "");
 }
 
 static int get_activity_flags()
@@ -466,55 +330,38 @@ static bool look_for_cmd_admin_flags(const char *cmd, FlagBits *pFlags)
 	return g_ConCmds.LookForCommandAdminFlags(cmd, pFlags);
 }
 
-int read_cmd_argc(const CCommand &args)
-{
-	return args.ArgC();
-}
-
-static const char *read_cmd_arg(const CCommand &args, int arg)
-{
-	return args.Arg(arg);
-}
-
-static int load_mms_plugin(const char *file, bool *ok, char *error, size_t maxlength)
-{
-	bool ignore_already;
-	PluginId id = g_pMMPlugins->Load(file, g_PLID, ignore_already, error, maxlength);
-
-	Pl_Status status;
-
-#ifndef METAMOD_PLAPI_VERSION
-	const char *filep;
-	PluginId source;
-#endif
-
-	if (!id || (
-#ifndef METAMOD_PLAPI_VERSION
-		g_pMMPlugins->Query(id, filep, status, source)
-#else
-		g_pMMPlugins->Query(id, NULL, &status, NULL)
-#endif
-		&& status < Pl_Paused))
-	{
-		*ok = false;
-	}
-	else
-	{
-		*ok = true;
-	}
-
-	return id;
-}
-
-static void unload_mms_plugin(int id)
-{
-	char ignore[255];
-	g_pMMPlugins->Unload(id, true, ignore, sizeof(ignore));
-}
-
 void do_global_plugin_loads()
 {
 	g_SourceMod.DoGlobalPluginLoads();
+}
+
+static int get_global_target()
+{
+	return g_SourceMod.GetGlobalTarget();
+}
+
+void UTIL_ConsolePrintVa(const char *fmt, va_list ap)
+{
+	char buffer[512];
+	size_t len = ke::SafeVsprintf(buffer, sizeof(buffer), fmt, ap);
+
+	if (len >= sizeof(buffer) - 1)
+	{
+		buffer[510] = '\n';
+		buffer[511] = '\0';
+	} else {
+		buffer[len++] = '\n';
+		buffer[len] = '\0';
+	}
+	META_CONPRINT(buffer);
+}
+
+void UTIL_ConsolePrint(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	UTIL_ConsolePrintVa(fmt, ap);
+	va_end(ap);
 }
 
 #if defined METAMOD_PLAPI_VERSION
@@ -567,86 +414,292 @@ void do_global_plugin_loads()
 
 static ServerGlobals serverGlobals;
 
-static sm_core_t core_bridge =
+CoreProviderImpl sCoreProviderImpl;
+
+CoreProviderImpl::CoreProviderImpl()
 {
-	/* Objects */
-	&g_SourceMod,
-	&g_LibSys,
-	reinterpret_cast<IVEngineServer*>(&logic_engine),
-	reinterpret_cast<IFileSystem*>(&logic_filesystem),
-	&logic_playerinfo,
-	&g_RootMenu,
-	&g_Timers,
-	&g_Players,
-	&g_HL2,
-	&g_Menus,
-	&g_pSourcePawn,
-	&g_pSourcePawn2,
-	/* Functions */
-	find_convar,
-	strncopy,
-	UTIL_TrimWhitespace,
-	log_to_game,
-	conprint,
-	get_cvar_string,
-	get_cvar_bool,
-	UTIL_Format,
-	UTIL_FormatArgs,
-	gnprintf,
-	atcprintf,
-	get_game_name,
-	get_game_description,
-	get_source_engine_name,
-	symbols_are_hidden,
-	get_core_config_value,
-	is_map_loading,
-	is_map_running,
-	read_cmd_argc,
-	read_cmd_arg,
-	load_mms_plugin,
-	unload_mms_plugin,
-	do_global_plugin_loads,
-	SM_AreConfigsExecuted,
-	SM_ExecuteForPlugin,
-	keyvalues_to_dbinfo,
-	get_activity_flags,
-	get_immunity_mode,
-	update_admin_cmd_flags,
-	look_for_cmd_admin_flags,
-	GAMEFIX,
-	&serverGlobals,
-};
+	this->sm = &g_SourceMod;
+	this->engine = &engine_wrapper;
+	this->filesystem = &fs_wrapper;
+	this->playerInfo = &playerinfo_wrapper;
+	this->timersys = &g_Timers;
+	this->playerhelpers = &g_Players;
+	this->gamehelpers = &g_HL2;
+	this->menus = &g_Menus;
+	this->spe1 = &g_pSourcePawn;
+	this->spe2 = &g_pSourcePawn2;
+	this->GetCoreConfigValue = get_core_config_value;
+	this->DoGlobalPluginLoads = do_global_plugin_loads;
+	this->AreConfigsExecuted = SM_AreConfigsExecuted;
+	this->ExecuteConfigs = SM_ExecuteForPlugin;
+	this->GetDBInfoFromKeyValues = keyvalues_to_dbinfo;
+	this->GetActivityFlags = get_activity_flags;
+	this->GetImmunityMode = get_immunity_mode;
+	this->UpdateAdminCmdFlags = update_admin_cmd_flags;
+	this->LookForCommandAdminFlags = look_for_cmd_admin_flags;
+	this->GetGlobalTarget = get_global_target;
+	this->gamesuffix = GAMEFIX;
+	this->serverGlobals = &::serverGlobals;
+	this->serverFactory = nullptr;
+	this->engineFactory = nullptr;
+	this->matchmakingDSFactory = nullptr;
+	this->listeners = nullptr;
+}
 
-void InitLogicBridge()
+ConVar *CoreProviderImpl::FindConVar(const char *name)
 {
-	serverGlobals.universalTime = g_pUniversalTime;
-	serverGlobals.frametime = &gpGlobals->frametime;
-	serverGlobals.interval_per_tick = &gpGlobals->interval_per_tick;
+	return icvar->FindVar(name);
+}
 
-	core_bridge.engineFactory = (void *)g_SMAPI->GetEngineFactory(false);
-	core_bridge.serverFactory = (void *)g_SMAPI->GetServerFactory(false);
-	core_bridge.listeners = SMGlobalClass::head;
+const char *CoreProviderImpl::GetCvarString(ConVar* cvar)
+{
+	return cvar->GetString();
+}
 
-	ILibrary *mmlib;
+bool CoreProviderImpl::GetCvarBool(ConVar* cvar)
+{
+	return cvar->GetBool();
+}
+
+bool CoreProviderImpl::GetGameName(char *buffer, size_t maxlength)
+{
+	KeyValues *pGameInfo = new KeyValues("GameInfo");
+	if (g_HL2.KVLoadFromFile(pGameInfo, basefilesystem, "gameinfo.txt"))
+	{
+		const char *str;
+		if ((str = pGameInfo->GetString("game", NULL)) != NULL)
+		{
+			ke::SafeStrcpy(buffer, maxlength, str);
+			pGameInfo->deleteThis();
+			return true;
+		}
+	}
+	pGameInfo->deleteThis();
+	return false;
+}
+
+const char *CoreProviderImpl::GetGameDescription()
+{
+	return SERVER_CALL(GetGameDescription)();
+}
+
+const char *CoreProviderImpl::GetSourceEngineName()
+{
+#if !defined SOURCE_ENGINE
+# error "Unknown engine type"
+#endif
+#if SOURCE_ENGINE == SE_EPISODEONE
+	return "original";
+#elif SOURCE_ENGINE == SE_DARKMESSIAH
+	return "darkmessiah";
+#elif SOURCE_ENGINE == SE_ORANGEBOX
+	return "orangebox";
+#elif SOURCE_ENGINE == SE_BLOODYGOODTIME
+	return "bloodygoodtime";
+#elif SOURCE_ENGINE == SE_EYE
+	return "eye";
+#elif SOURCE_ENGINE == SE_CSS
+	return "css";
+#elif SOURCE_ENGINE == SE_HL2DM
+	return "hl2dm";
+#elif SOURCE_ENGINE == SE_DODS
+	return "dods";
+#elif SOURCE_ENGINE == SE_SDK2013
+	return "sdk2013";
+#elif SOURCE_ENGINE == SE_BMS
+	return "bms";
+#elif SOURCE_ENGINE == SE_TF2
+	return "tf2";
+#elif SOURCE_ENGINE == SE_LEFT4DEAD
+	return "left4dead";
+#elif SOURCE_ENGINE == SE_NUCLEARDAWN
+	return "nucleardawn";
+#elif SOURCE_ENGINE == SE_CONTAGION
+	return "contagion";
+#elif SOURCE_ENGINE == SE_LEFT4DEAD2
+	return "left4dead2";
+#elif SOURCE_ENGINE == SE_ALIENSWARM
+	return "alienswarm";
+#elif SOURCE_ENGINE == SE_PORTAL2
+	return "portal2";
+#elif SOURCE_ENGINE == SE_BLADE
+	return "blade";
+#elif SOURCE_ENGINE == SE_INSURGENCY
+	return "insurgency";
+#elif SOURCE_ENGINE == SE_CSGO
+	return "csgo";
+#elif SOURCE_ENGINE == SE_DOTA
+	return "dota";
+#endif
+}
+
+bool CoreProviderImpl::SymbolsAreHidden()
+{
+#if (SOURCE_ENGINE == SE_CSS)            \
+	|| (SOURCE_ENGINE == SE_HL2DM)       \
+	|| (SOURCE_ENGINE == SE_DODS)        \
+	|| (SOURCE_ENGINE == SE_SDK2013)     \
+	|| (SOURCE_ENGINE == SE_BMS)         \
+	|| (SOURCE_ENGINE == SE_TF2)         \
+	|| (SOURCE_ENGINE == SE_LEFT4DEAD)   \
+	|| (SOURCE_ENGINE == SE_NUCLEARDAWN) \
+	|| (SOURCE_ENGINE == SE_LEFT4DEAD2)  \
+	|| (SOURCE_ENGINE == SE_INSURGENCY)  \
+	|| (SOURCE_ENGINE == SE_BLADE)       \
+	|| (SOURCE_ENGINE == SE_CSGO)        \
+	|| (SOURCE_ENGINE == SE_DOTA)
+	return true;
+#else
+	return false;
+#endif
+}
+
+void CoreProviderImpl::LogToGame(const char *message)
+{
+	Engine_LogPrintWrapper(message);
+}
+
+void CoreProviderImpl::ConPrint(const char *message)
+{
+	META_CONPRINT(message);
+}
+
+void CoreProviderImpl::ConsolePrint(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	UTIL_ConsolePrintVa(fmt, ap);
+	va_end(ap);
+}
+
+void CoreProviderImpl::ConsolePrintVa(const char *message, va_list ap)
+{
+	UTIL_ConsolePrintVa(message, ap);
+}
+
+bool CoreProviderImpl::IsMapLoading()
+{
+	return g_SourceMod.IsMapLoading();
+}
+
+bool CoreProviderImpl::IsMapRunning()
+{
+	return g_SourceMod.IsMapRunning();
+}
+
+int CoreProviderImpl::MaxClients()
+{
+	return g_Players.MaxClients();
+}
+
+bool CoreProviderImpl::DescribePlayer(int index, const char **namep, const char **authp, int *useridp)
+{
+	CPlayer *player = g_Players.GetPlayerByIndex(index);
+	if (!player || !player->IsConnected())
+		return false;
+
+	if (namep)
+		*namep = player->GetName();
+	if (authp) {
+		const char *auth = player->GetAuthString();
+		*authp = (auth && *auth) ? auth : "STEAM_ID_PENDING";
+	}
+	if (useridp)
+		*useridp = GetPlayerUserId(player->GetEdict());
+	return true;
+}
+
+int CoreProviderImpl::LoadMMSPlugin(const char *file, bool *ok, char *error, size_t maxlength)
+{
+	bool ignore_already;
+	PluginId id = g_pMMPlugins->Load(file, g_PLID, ignore_already, error, maxlength);
+
+	Pl_Status status;
+
+#ifndef METAMOD_PLAPI_VERSION
+	const char *filep;
+	PluginId source;
+#endif
+
+	if (!id || (
+#ifndef METAMOD_PLAPI_VERSION
+		g_pMMPlugins->Query(id, filep, status, source)
+#else
+		g_pMMPlugins->Query(id, NULL, &status, NULL)
+#endif
+		&& status < Pl_Paused))
+	{
+		*ok = false;
+	}
+	else
+	{
+		*ok = true;
+	}
+
+	return id;
+}
+
+void CoreProviderImpl::UnloadMMSPlugin(int id)
+{
+	char ignore[255];
+	g_pMMPlugins->Unload(id, true, ignore, sizeof(ignore));
+}
+
+bool CoreProviderImpl::IsClientConVarQueryingSupported()
+{
+	return hooks_.GetClientCvarQueryMode() != ClientCvarQueryMode::Unavailable;
+}
+
+int CoreProviderImpl::QueryClientConVar(int client, const char *cvar)
+{
+#if SOURCE_ENGINE != SE_DARKMESSIAH
+	switch (hooks_.GetClientCvarQueryMode()) {
+	case ClientCvarQueryMode::DLL:
+# if SOURCE_ENGINE == SE_DOTA
+		return ::engine->StartQueryCvarValue(CEntityIndex(client), cvar);
+# else
+		return ::engine->StartQueryCvarValue(PEntityOfEntIndex(client), cvar);
+# endif
+	case ClientCvarQueryMode::VSP:
+# if SOURCE_ENGINE != SE_DOTA
+		return serverpluginhelpers->StartQueryCvarValue(PEntityOfEntIndex(client), cvar);
+# endif
+	default:
+		return InvalidQueryCvarCookie;
+	}
+#endif
+	return -1;
+}
+
+void CoreProviderImpl::InitializeBridge()
+{
+	::serverGlobals.universalTime = g_pUniversalTime;
+	::serverGlobals.frametime = &gpGlobals->frametime;
+	::serverGlobals.interval_per_tick = &gpGlobals->interval_per_tick;
+
+	this->engineFactory = (void *)g_SMAPI->GetEngineFactory(false);
+	this->serverFactory = (void *)g_SMAPI->GetServerFactory(false);
+	this->listeners = SMGlobalClass::head;
+
 	char path[PLATFORM_MAX_PATH];
 
-	g_LibSys.PathFormat(path, sizeof(path), "%s/bin/matchmaking_ds%s.%s", g_SMAPI->GetBaseDir(), MATCHMAKINGDS_SUFFIX, MATCHMAKINGDS_EXT);
+	ke::path::Format(path, sizeof(path),
+	                 "%s/bin/matchmaking_ds%s.%s",
+                     g_SMAPI->GetBaseDir(),
+                     MATCHMAKINGDS_SUFFIX,
+                     MATCHMAKINGDS_EXT);
 
-	if ((mmlib = g_LibSys.OpenLibrary(path, NULL, 0)))
-	{
-		core_bridge.matchmakingDSFactory = mmlib->GetSymbolAddress("CreateInterface");
-		mmlib->CloseLibrary();
+	if (ke::Ref<ke::SharedLib> mmlib = ke::SharedLib::Open(path, NULL, 0)) {
+		this->matchmakingDSFactory =
+		  mmlib->get<decltype(sCoreProviderImpl.matchmakingDSFactory)>("CreateInterface");
 	}
 	
-	logic_init_fn(&core_bridge, &logicore);
+	logic_init_(this, &logicore);
 
-	/* Add SMGlobalClass instances */
+	// Join logic's SMGlobalClass instances.
 	SMGlobalClass* glob = SMGlobalClass::head;
-	while (glob->m_pGlobalClassNext != NULL)
-	{
+	while (glob->m_pGlobalClassNext)
 		glob = glob->m_pGlobalClassNext;
-	}
-	assert(glob->m_pGlobalClassNext == NULL);
 	glob->m_pGlobalClassNext = logicore.head;
 
 	g_pThreader = logicore.threader;
@@ -658,11 +711,11 @@ void InitLogicBridge()
 	handlesys = logicore.handlesys;
 	forwardsys = logicore.forwardsys;
 	adminsys = logicore.adminsys;
-	profiletool = logicore.profiletool;
 	logger = logicore.logger;
+	rootmenu = logicore.rootmenu;
 }
 
-bool StartLogicBridge(char *error, size_t maxlength)
+bool CoreProviderImpl::LoadBridge(char *error, size_t maxlength)
 {
 	char file[PLATFORM_MAX_PATH];
 
@@ -673,38 +726,107 @@ bool StartLogicBridge(char *error, size_t maxlength)
 		g_SourceMod.GetSourceModPath());
 
 	char myerror[255];
-	g_pLogic = g_LibSys.OpenLibrary(file, myerror, sizeof(myerror));
-
-	if (!g_pLogic)
-	{
-		if (error && maxlength)
-		{
-			UTIL_Format(error, maxlength, "failed to load %s: %s", file, myerror);
-		}
+	logic_ = ke::SharedLib::Open(file, myerror, sizeof(myerror));
+	if (!logic_) {
+		ke::SafeSprintf(error, maxlength, "failed to load %s: %s", file, myerror);
 		return false;
 	}
 
-	LogicLoadFunction llf = (LogicLoadFunction)g_pLogic->GetSymbolAddress("logic_load");
-	if (llf == NULL)
-	{
-		g_pLogic->CloseLibrary();
-		if (error && maxlength)
-		{
-			UTIL_Format(error, maxlength, "could not find logic_load function");
-		}
+	LogicLoadFunction llf = logic_->get<decltype(llf)>("logic_load");
+	if (!llf) {
+		logic_ = nullptr;
+		ke::SafeSprintf(error, maxlength, "could not find logic_load function");
 		return false;
 	}
 
-	GetITextParsers getitxt = (GetITextParsers)g_pLogic->GetSymbolAddress("get_textparsers");
+	GetITextParsers getitxt = logic_->get<decltype(getitxt)>("get_textparsers");
 	textparsers = getitxt();
 
-	logic_init_fn = llf(SM_LOGIC_MAGIC);
-
+	logic_init_ = llf(SM_LOGIC_MAGIC);
+	if (!logic_init_) {
+		ke::SafeSprintf(error, maxlength, "component version mismatch");
+		return false;
+	}
 	return true;
+}
+
+ke::PassRef<CommandHook>
+CoreProviderImpl::AddCommandHook(ConCommand *cmd, const CommandHook::Callback &callback)
+{
+	return hooks_.AddCommandHook(cmd, callback);
+}
+
+ke::PassRef<CommandHook>
+CoreProviderImpl::AddPostCommandHook(ConCommand *cmd, const CommandHook::Callback &callback)
+{
+	return hooks_.AddPostCommandHook(cmd, callback);
+}
+
+CoreProviderImpl::CommandImpl::CommandImpl(ConCommand *cmd, CommandHook *hook)
+: cmd_(cmd),
+  hook_(hook)
+{
+}
+
+CoreProviderImpl::CommandImpl::~CommandImpl()
+{
+	hook_ = nullptr;
+
+	g_SMAPI->UnregisterConCommandBase(g_PLAPI, cmd_);
+	delete [] const_cast<char *>(cmd_->GetHelpText());
+	delete [] const_cast<char *>(cmd_->GetName());
+	delete cmd_;
+}
+
+void
+CoreProviderImpl::DefineCommand(const char *name, const char *help, const CommandFunc &callback)
+{
+	char *new_name = sm_strdup(name);
+	char *new_help = sm_strdup(help);
+	int flags = 0;
+
+	auto ignore_callback = [] (DISPATCH_ARGS) -> void {
+	};
+
+	ConCommand *cmd = new ConCommand(new_name, ignore_callback, new_help, flags);
+	ke::Ref<CommandHook> hook = AddCommandHook(cmd, callback);
+
+	ke::Ref<CommandImpl> impl = new CommandImpl(cmd, hook);
+	commands_.append(impl);
+}
+
+void CoreProviderImpl::InitializeHooks()
+{
+	hooks_.Start();
+}
+
+void CoreProviderImpl::OnVSPReceived()
+{
+	hooks_.OnVSPReceived();
+}
+
+void CoreProviderImpl::ShutdownHooks()
+{
+	commands_.clear();
+	hooks_.Shutdown();
+}
+
+void CoreProviderImpl::ShutdownBridge()
+{
+	logic_ = nullptr;
+}
+
+void InitLogicBridge()
+{
+	sCoreProviderImpl.InitializeBridge();
+}
+
+bool StartLogicBridge(char *error, size_t maxlength)
+{
+	return sCoreProviderImpl.LoadBridge(error, maxlength);
 }
 
 void ShutdownLogicBridge()
 {
-	g_pLogic->CloseLibrary();
+	sCoreProviderImpl.ShutdownBridge();
 }
-

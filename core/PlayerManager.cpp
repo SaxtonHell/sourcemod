@@ -45,9 +45,13 @@
 #include <IGameConfigs.h>
 #include "ConsoleDetours.h"
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
 #include <sourcemod_version.h>
 #include "smn_keyvalues.h"
+#include "command_args.h"
+#include <ITranslator.h>
+#include <bridge/include/IExtensionBridge.h>
+#include <bridge/include/IScriptManager.h>
+#include <bridge/include/ILogger.h>
 
 PlayerManager g_Players;
 bool g_OnMapStarted = false;
@@ -101,11 +105,7 @@ SH_DECL_EXTERN1_void(ConCommand, Dispatch, SH_NOATTRIB, false, const CCommand &)
 #elif SOURCE_ENGINE == SE_DARKMESSIAH
 SH_DECL_EXTERN0_void(ConCommand, Dispatch, SH_NOATTRIB, false);
 #else
-# if SH_IMPL_VERSION >= 4
- extern int __SourceHook_FHAddConCommandDispatch(void *,bool,class fastdelegate::FastDelegate0<void>);
-# else
- extern bool __SourceHook_FHAddConCommandDispatch(void *,bool,class fastdelegate::FastDelegate0<void>);
-# endif
+extern int __SourceHook_FHAddConCommandDispatch(void *,bool,class fastdelegate::FastDelegate0<void>);
 extern bool __SourceHook_FHRemoveConCommandDispatch(void *,bool,class fastdelegate::FastDelegate0<void>);
 #endif
 
@@ -288,7 +288,7 @@ ConfigResult PlayerManager::OnSourceModConfigChanged(const char *key,
 		} else if (strcasecmp(value, "off") == 0) {
 			m_QueryLang = false;
 		} else {
-			UTIL_Format(error, maxlength, "Invalid value: must be \"on\" or \"off\"");
+			ke::SafeSprintf(error, maxlength, "Invalid value: must be \"on\" or \"off\"");
 			return ConfigResult_Reject;
 		}
 		return ConfigResult_Accept;
@@ -299,7 +299,7 @@ ConfigResult PlayerManager::OnSourceModConfigChanged(const char *key,
 		} else if ( strcasecmp(value, "no") == 0) {
 			m_bAuthstringValidation = false;
 		} else {
-			UTIL_Format(error, maxlength, "Invalid value: must be \"yes\" or \"no\"");
+			ke::SafeSprintf(error, maxlength, "Invalid value: must be \"yes\" or \"no\"");
 			return ConfigResult_Reject;
 		}
 		return ConfigResult_Accept;
@@ -412,8 +412,6 @@ bool PlayerManager::CheckSetAdminName(int index, CPlayer *pPlayer, AdminId id)
 
 void PlayerManager::RunAuthChecks()
 {
-	SM_PROFILE("PlayerManager::RunAuthChecks");
-
 	CPlayer *pPlayer;
 	const char *authstr;
 	unsigned int removed = 0;
@@ -511,9 +509,6 @@ bool PlayerManager::OnClientConnect(edict_t *pEntity, const char *pszName, const
 {
 	int client = IndexOfEdict(pEntity);
 #endif
-
-	SM_PROFILE("PlayerManager::OnClientConnect");
-
 	CPlayer *pPlayer = &m_Players[client];
 	++m_PlayersSinceActive;
 
@@ -607,8 +602,6 @@ bool PlayerManager::OnClientConnect_Post(edict_t *pEntity, const char *pszName, 
 	int client = IndexOfEdict(pEntity);
 #endif
 
-	SM_PROFILE("PlayerManager::OnClientConnect_Post");
-
 	bool orig_value = META_RESULT_ORIG_RET(bool);
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -653,8 +646,6 @@ void PlayerManager::OnClientPutInServer(CEntityIndex index, const char *playerna
 #else
 void PlayerManager::OnClientPutInServer(edict_t *pEntity, const char *playername)
 {
-	SM_PROFILE("PlayerManager::OnClientPutInServer");
-
 	int client = IndexOfEdict(pEntity);
 #endif
 
@@ -868,8 +859,6 @@ void PlayerManager::OnClientDisconnect(edict_t *pEntity)
 	int client = IndexOfEdict(pEntity);
 #endif
 
-	SM_PROFILE("PlayerManager::OnClientDisconnect");
-
 	cell_t res;
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -908,9 +897,6 @@ void PlayerManager::OnClientDisconnect_Post(edict_t *pEntity)
 {
 	int client = IndexOfEdict(pEntity);
 #endif
-
-	SM_PROFILE("PlayerManager::OnClientDisconnect_Post");
-
 	CPlayer *pPlayer = &m_Players[client];
 	if (!pPlayer->IsConnected())
 	{
@@ -983,8 +969,6 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 	int client = IndexOfEdict(pEntity);
 #endif
 	
-	SM_PROFILE("PlayerManager::OnClientCommand");
-
 	cell_t res = Pl_Continue;
 	CPlayer *pPlayer = &m_Players[client];
 
@@ -1023,7 +1007,8 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 		RETURN_META(MRES_SUPERCEDE);
 	}
 
-	g_HL2.PushCommandStack(&args);
+	EngineArgs cargs(args);
+	AutoEnterCommand autoEnterCommand(&cargs);
 
 	int argcount = args.ArgC() - 1;
 	const char *cmd = g_HL2.CurrentCommandName();
@@ -1042,10 +1027,9 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 
 	if (g_ConsoleDetours.IsEnabled())
 	{
-		cell_t res2 = g_ConsoleDetours.InternalDispatch(client, args);
+		cell_t res2 = g_ConsoleDetours.InternalDispatch(client, &cargs);
 		if (res2 >= Pl_Stop)
 		{
-			g_HL2.PopCommandStack();
 			RETURN_META(MRES_SUPERCEDE);
 		}
 		else if (res2 > res)
@@ -1069,13 +1053,10 @@ void PlayerManager::OnClientCommand(edict_t *pEntity)
 
 	if (res >= Pl_Stop)
 	{
-		g_HL2.PopCommandStack();
 		RETURN_META(MRES_SUPERCEDE);
 	}
 
 	res = g_ConCmds.DispatchClientCommand(client, cmd, argcount, (ResultType)res);
-
-	g_HL2.PopCommandStack();
 
 	if (res >= Pl_Handled)
 	{
@@ -1278,8 +1259,6 @@ int PlayerManager::GetNumPlayers()
 
 int PlayerManager::GetClientOfUserId(int userid)
 {
-	SM_PROFILE("PlayerManager::GetClientOfUserId");
-
 	if (userid < 0 || userid > USHRT_MAX)
 	{
 		return 0;
@@ -1468,8 +1447,6 @@ int PlayerManager::InternalFilterCommandTarget(CPlayer *pAdmin, CPlayer *pTarget
 
 void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 {
-	SM_PROFILE("PlayerManager::ProcessCommandTarget");
-
 	CPlayer *pTarget, *pAdmin;
 	int max_clients, total = 0;
 
@@ -1505,7 +1482,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 				{
 					info->targets[0] = client;
 					info->num_targets = 1;
-					strncopy(info->target_name, pTarget->GetName(), info->target_name_maxlength);
+					ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pTarget->GetName());
 					info->target_name_style = COMMAND_TARGETNAME_RAW;
 				}
 				else
@@ -1579,7 +1556,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 					{
 						info->targets[0] = i;
 						info->num_targets = 1;
-						strncopy(info->target_name, pTarget->GetName(), info->target_name_maxlength);
+						ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pTarget->GetName());
 						info->target_name_style = COMMAND_TARGETNAME_RAW;
 					}
 					else
@@ -1609,7 +1586,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 				{
 					info->targets[0] = i;
 					info->num_targets = 1;
-					strncopy(info->target_name, pTarget->GetName(), info->target_name_maxlength);
+					ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pTarget->GetName());
 					info->target_name_style = COMMAND_TARGETNAME_RAW;
 				}
 				else
@@ -1628,7 +1605,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 		{
 			info->targets[0] = info->admin;
 			info->num_targets = 1;
-			strncopy(info->target_name, pAdmin->GetName(), info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pAdmin->GetName());
 			info->target_name_style = COMMAND_TARGETNAME_RAW;
 		}
 		else
@@ -1647,7 +1624,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 		if (strcmp(info->pattern, "@all") == 0)
 		{
 			is_multi = true;
-			strncopy(info->target_name, "all players", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all players");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 		}
 		else if (strcmp(info->pattern, "@dead") == 0)
@@ -1660,7 +1637,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 				return;
 			}
 			info->flags |= COMMAND_FILTER_DEAD;
-			strncopy(info->target_name, "all dead players", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all dead players");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 		}
 		else if (strcmp(info->pattern, "@alive") == 0)
@@ -1672,7 +1649,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 				info->reason = COMMAND_TARGET_NOT_DEAD;
 				return;
 			}
-			strncopy(info->target_name, "all alive players", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all alive players");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 			info->flags |= COMMAND_FILTER_ALIVE;
 		}
@@ -1685,21 +1662,21 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 				info->reason = COMMAND_TARGET_NOT_HUMAN;
 				return;
 			}
-			strncopy(info->target_name, "all bots", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all bots");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 			bots_only = true;
 		}
 		else if (strcmp(info->pattern, "@humans") == 0)
 		{
 			is_multi = true;
-			strncopy(info->target_name, "all humans", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all humans");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 			info->flags |= COMMAND_FILTER_NO_BOTS;
 		}
 		else if (strcmp(info->pattern, "@!me") == 0)
 		{
 			is_multi = true;
-			strncopy(info->target_name, "all players", info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all players");
 			info->target_name_style = COMMAND_TARGETNAME_ML;
 			skip_client = info->admin;
 		}
@@ -1771,7 +1748,7 @@ void PlayerManager::ProcessCommandTarget(cmd_target_info_t *info)
 		{
 			info->targets[0] = found_client;
 			info->num_targets = 1;
-			strncopy(info->target_name, pFoundClient->GetName(), info->target_name_maxlength);
+			ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pFoundClient->GetName());
 			info->target_name_style = COMMAND_TARGETNAME_RAW;
 		}
 		else
@@ -1861,7 +1838,7 @@ void CmdMaxplayersCallback()
 }
 
 #if SOURCE_ENGINE == SE_CSGO
-bool PlayerManager::HandleConVarQuery(QueryCvarCookie_t cookie, edict_t *pPlayer, EQueryCvarValueStatus result, const char *cvarName, const char *cvarValue)
+bool PlayerManager::HandleConVarQuery(QueryCvarCookie_t cookie, int client, EQueryCvarValueStatus result, const char *cvarName, const char *cvarValue)
 {
 	for (int i = 1; i <= m_maxClients; i++)
 	{
@@ -1919,7 +1896,7 @@ void CPlayer::Initialize(const char *name, const char *ip, edict_t *pEntity)
 	m_Serial.bits.serial = g_PlayerSerialCount++;
 
 	char ip2[24], *ptr;
-	strncopy(ip2, ip, sizeof(ip2));
+	ke::SafeStrcpy(ip2, sizeof(ip2), ip);
 	if ((ptr = strchr(ip2, ':')) != NULL)
 	{
 		*ptr = '\0';
@@ -2282,7 +2259,7 @@ void CPlayer::Kick(const char *str)
 		if (userid > 0)
 		{
 			char buffer[255];
-			UTIL_Format(buffer, sizeof(buffer), "kickid %d %s\n", userid, str);
+			ke::SafeSprintf(buffer, sizeof(buffer), "kickid %d %s\n", userid, str);
 			engine->ServerCommand(buffer);
 		}
 	}
@@ -2312,8 +2289,6 @@ void CPlayer::Authorize_Post()
 
 void CPlayer::DoPostConnectAuthorization()
 {
-	SM_PROFILE("CPlayer::DoPostConnectAuthorization");
-
 	bool delay = false;
 
 	List<IClientListener *>::iterator iter;
@@ -2368,8 +2343,6 @@ bool CPlayer::RunAdminCacheChecks()
 
 void CPlayer::NotifyPostAdminChecks()
 {
-	SM_PROFILE("CPlayer::NotifyPostAdminChecks");
-
 	if (m_bAdminCheckSignalled)
 	{
 		return;
@@ -2402,8 +2375,6 @@ void CPlayer::NotifyPostAdminChecks()
 
 void CPlayer::DoBasicAdminChecks()
 {
-	SM_PROFILE("CPlayer::DoBasicAdminChecks");
-
 	if (GetAdminId() != INVALID_ADMIN_ID)
 	{
 		return;

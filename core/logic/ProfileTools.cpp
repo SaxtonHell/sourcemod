@@ -27,6 +27,7 @@
 
 #include "ProfileTools.h"
 #include <stdarg.h>
+#include <am-string.h>
 
 ProfileToolManager g_ProfileToolManager;
 
@@ -39,9 +40,7 @@ ProfileToolManager::ProfileToolManager()
 void
 ProfileToolManager::OnSourceModAllInitialized()
 {
-	rootmenu->AddRootConsoleCommand2("prof", "Profiling", this);
-
-	sharesys->AddInterface(NULL, this);
+	rootmenu->AddRootConsoleCommand3("prof", "Profiling", this);
 }
 
 void
@@ -67,7 +66,7 @@ render_help(const char *fmt, ...)
 
 	va_list ap;
 	va_start(ap, fmt);
-	smcore.FormatArgs(buffer, sizeof(buffer), fmt, ap);
+	ke::SafeVsprintf(buffer, sizeof(buffer), fmt, ap);
 	va_end(ap);
 
 	rootmenu->ConsolePrint("%s", buffer);
@@ -96,7 +95,7 @@ ProfileToolManager::StartFromConsole(IProfilingTool *tool)
 }
 
 void
-ProfileToolManager::OnRootConsoleCommand2(const char *cmdname, const ICommandArgs *args)
+ProfileToolManager::OnRootConsoleCommand(const char *cmdname, const ICommandArgs *args)
 {
 	if (tools_.length() == 0) {
 		rootmenu->ConsolePrint("No profiling tools are enabled.");

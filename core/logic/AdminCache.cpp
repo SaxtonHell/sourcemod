@@ -41,6 +41,9 @@
 #include "common_logic.h"
 #include "ProfileTools.h"
 #include "stringutil.h"
+#include <bridge/include/ILogger.h>
+#include <bridge/include/CoreProvider.h>
+#include <bridge/include/IVEngineServerBridge.h>
 
 #define LEVEL_STATE_NONE		0
 #define LEVEL_STATE_LEVELS		1
@@ -269,6 +272,21 @@ void AdminCache::OnSourceModStartup(bool late)
 	NameFlag("custom4", Admin_Custom4);
 	NameFlag("custom5", Admin_Custom5);
 	NameFlag("custom6", Admin_Custom6);
+
+	auto sm_dump_admcache = [this] (int client, const ICommandArgs *args) -> bool {
+		char buffer[PLATFORM_MAX_PATH];
+		g_pSM->BuildPath(Path_SM, buffer, sizeof(buffer), "data/admin_cache_dump.txt");
+
+		if (!DumpCache(buffer)) {
+			bridge->ConsolePrint("Could not open file for writing: %s", buffer);
+			return true;
+		}
+
+		bridge->ConsolePrint("Admin cache dumped to: %s", buffer);
+		return true;
+	};
+
+	bridge->DefineCommand("sm_dump_admcache", "Dumps the admin cache for debugging", sm_dump_admcache);
 }
 
 void AdminCache::OnSourceModAllInitialized()
@@ -329,7 +347,7 @@ void AdminCache::AddCommandOverride(const char *cmd, OverrideType type, FlagBits
 		return;
 
 	map->insert(cmd, flags);
-	smcore.UpdateAdminCmdFlags(cmd, type, flags, false);
+	bridge->UpdateAdminCmdFlags(cmd, type, flags, false);
 }
 
 bool AdminCache::GetCommandOverride(const char *cmd, OverrideType type, FlagBits *pFlags)
@@ -360,13 +378,13 @@ void AdminCache::UnsetCommandOverride(const char *cmd, OverrideType type)
 void AdminCache::_UnsetCommandGroupOverride(const char *group)
 {
 	m_CmdGrpOverrides.remove(group);
-	smcore.UpdateAdminCmdFlags(group, Override_CommandGroup, 0, true);
+	bridge->UpdateAdminCmdFlags(group, Override_CommandGroup, 0, true);
 }
 
 void AdminCache::_UnsetCommandOverride(const char *cmd)
 {
 	m_CmdOverrides.remove(cmd);
-	smcore.UpdateAdminCmdFlags(cmd, Override_Command, 0, true);
+	bridge->UpdateAdminCmdFlags(cmd, Override_Command, 0, true);
 }
 
 void AdminCache::DumpCommandOverrideCache(OverrideType type)
@@ -1533,7 +1551,7 @@ bool AdminCache::CanAdminTarget(AdminId id, AdminId target)
 	}
 
 	/** Fourth, if the targeted admin is immune from targeting admin. */
-	int mode = smcore.GetImmunityMode();
+	int mode = bridge->GetImmunityMode();
 	switch (mode)
 	{
 		case 1:
@@ -1672,7 +1690,7 @@ bool AdminCache::CanAdminUseCommand(int client, const char *cmd)
 		cmd++;
 	}
 
-	if (!smcore.LookForCommandAdminFlags(cmd, &bits))
+	if (!bridge->LookForCommandAdminFlags(cmd, &bits))
 	{
 		if (!GetCommandOverride(cmd, otype, &bits))
 		{
@@ -1749,7 +1767,7 @@ bool AdminCache::CheckAccess(int client, const char *cmd, FlagBits flags, bool o
 	bool found_command = false;
 	if (!override_only)
 	{
-		found_command = smcore.LookForCommandAdminFlags(cmd, &bits);
+		found_command = bridge->LookForCommandAdminFlags(cmd, &bits);
 	}
 
 	if (!found_command)

@@ -47,11 +47,11 @@ public:
 	ProfileToolManager();
 
 	// SMGlobalClass
-	void OnSourceModAllInitialized() KE_OVERRIDE;
-	void OnSourceModShutdown() KE_OVERRIDE;
+	void OnSourceModAllInitialized() override;
+	void OnSourceModShutdown() override;
 
 	// IRootConsoleCommand
-	void OnRootConsoleCommand2(const char *cmdname, const ICommandArgs *args) KE_OVERRIDE;
+	void OnRootConsoleCommand(const char *cmdname, const ICommandArgs *args) override;
 
 	// IProfileToolManager
 	void RegisterTool(SourcePawn::IProfilingTool *tool) {

@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include "sourcemod.h"
 #include "sourcemm_api.h"
-#include "LibrarySys.h"
 #include <sh_string.h>
 #include "CoreConfig.h"
 #include "Logger.h"
@@ -42,16 +41,23 @@
 #include <IGameConfigs.h>
 #include "frame_hooks.h"
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
+#include "provider.h"
+#include <amtl/os/am-shared-library.h>
+#include <amtl/os/am-path.h>
+#include <bridge/include/IExtensionBridge.h>
+#include <bridge/include/IScriptManager.h>
+#include <bridge/include/IProviderCallbacks.h>
+#include <bridge/include/ILogger.h>
 
 SH_DECL_HOOK6(IServerGameDLL, LevelInit, SH_NOATTRIB, false, bool, const char *, const char *, const char *, const char *, bool, bool);
 SH_DECL_HOOK0_void(IServerGameDLL, LevelShutdown, SH_NOATTRIB, false);
 SH_DECL_HOOK1_void(IServerGameDLL, GameFrame, SH_NOATTRIB, false, bool);
+SH_DECL_HOOK1_void(IServerGameDLL, Think, SH_NOATTRIB, false, bool);
 SH_DECL_HOOK1_void(IVEngineServer, ServerCommand, SH_NOATTRIB, false, const char *);
 
 SourceModBase g_SourceMod;
 
-ILibrary *g_pJIT = NULL;
+ke::Ref<ke::SharedLib> g_JIT;
 SourceHook::String g_BaseDir;
 ISourcePawnEngine *g_pSourcePawn = NULL;
 ISourcePawnEngine2 *g_pSourcePawn2 = NULL;
@@ -62,6 +68,7 @@ IGameConfig *g_pGameConf = NULL;
 bool g_Loaded = false;
 bool sm_show_debug_spew = false;
 bool sm_disable_jit = false;
+SMGlobalClass *SMGlobalClass::head = nullptr;
 
 #ifdef PLATFORM_WINDOWS
 ConVar sm_basepath("sm_basepath", "addons\\sourcemod", 0, "SourceMod base path (set via command line)");
@@ -80,8 +87,7 @@ void ShutdownJIT()
 		g_pSourcePawn = NULL;
 	}
 
-	g_pJIT->CloseLibrary();
-	g_pJIT = NULL;
+	g_JIT = nullptr;
 }
 
 SourceModBase::SourceModBase()
@@ -101,14 +107,14 @@ ConfigResult SourceModBase::OnSourceModConfigChanged(const char *key,
 	{
 		if (source == ConfigSource_Console)
 		{
-			UTIL_Format(error, maxlength, "Cannot be set at runtime");
+			ke::SafeSprintf(error, maxlength, "Cannot be set at runtime");
 			return ConfigResult_Reject;
 		}
 
 		if (!m_GotBasePath)
 		{
-			g_LibSys.PathFormat(m_SMBaseDir, sizeof(m_SMBaseDir), "%s/%s", g_BaseDir.c_str(), value);
-			g_LibSys.PathFormat(m_SMRelDir, sizeof(m_SMRelDir), value);
+			ke::path::Format(m_SMBaseDir, sizeof(m_SMBaseDir), "%s/%s", g_BaseDir.c_str(), value);
+			ke::path::Format(m_SMRelDir, sizeof(m_SMRelDir), value);
 
 			m_GotBasePath = true;
 		}
@@ -148,7 +154,7 @@ bool SourceModBase::InitializeSourceMod(char *error, size_t maxlength, bool late
 	{
 		if (gamepath[i] == PLATFORM_SEP_CHAR)
 		{
-			strncopy(m_ModDir, &gamepath[++i], sizeof(m_ModDir));
+			ke::SafeStrcpy(m_ModDir, sizeof(m_ModDir), &gamepath[++i]);
 			break;
 		}
 	}
@@ -165,10 +171,10 @@ bool SourceModBase::InitializeSourceMod(char *error, size_t maxlength, bool late
 		basepath = sm_basepath.GetDefault();
 	}
 
-	g_LibSys.PathFormat(m_SMBaseDir, sizeof(m_SMBaseDir), "%s/%s", g_BaseDir.c_str(), basepath);
-	g_LibSys.PathFormat(m_SMRelDir, sizeof(m_SMRelDir), "%s", basepath);
+	ke::path::Format(m_SMBaseDir, sizeof(m_SMBaseDir), "%s/%s", g_BaseDir.c_str(), basepath);
+	ke::path::Format(m_SMRelDir, sizeof(m_SMRelDir), "%s", basepath);
 
-	if (!StartLogicBridge(error, maxlength))
+	if (!sCoreProviderImpl.LoadBridge(error, maxlength))
 	{
 		return false;
 	}
@@ -184,12 +190,12 @@ bool SourceModBase::InitializeSourceMod(char *error, size_t maxlength, bool late
 		PLATFORM_LIB_EXT
 		);
 
-	g_pJIT = g_LibSys.OpenLibrary(file, myerror, sizeof(myerror));
-	if (!g_pJIT)
+	g_JIT = ke::SharedLib::Open(file, myerror, sizeof(myerror));
+	if (!g_JIT)
 	{
 		if (error && maxlength)
 		{
-			UTIL_Format(error, maxlength, "%s (failed to load bin/sourcepawn.jit.x86.%s)", 
+			ke::SafeSprintf(error, maxlength, "%s (failed to load bin/sourcepawn.jit.x86.%s)", 
 				myerror,
 				PLATFORM_LIB_EXT);
 		}
@@ -197,7 +203,7 @@ bool SourceModBase::InitializeSourceMod(char *error, size_t maxlength, bool late
 	}
 
 	GetSourcePawnFactoryFn factoryFn =
-		(GetSourcePawnFactoryFn)g_pJIT->GetSymbolAddress("GetSourcePawnFactory");
+	  g_JIT->get<decltype(factoryFn)>("GetSourcePawnFactory");
 
 	if (!factoryFn) {
 		if (error && maxlength)
@@ -252,7 +258,7 @@ void SourceModBase::StartSourceMod(bool late)
 	enginePatch = SH_GET_CALLCLASS(engine);
 	gamedllPatch = SH_GET_CALLCLASS(gamedll);
 
-	InitLogicBridge();
+	sCoreProviderImpl.InitializeBridge();
 
 	/* Initialize CoreConfig to get the SourceMod base path properly - this parses core.cfg */
 	g_CoreConfig.Initialize();
@@ -265,6 +271,8 @@ void SourceModBase::StartSourceMod(bool late)
 		pBase = pBase->m_pGlobalClassNext;
 	}
 	g_pGameConf = logicore.GetCoreGameConfig();
+
+	sCoreProviderImpl.InitializeHooks();
 
 	/* Notify! */
 	pBase = SMGlobalClass::head;
@@ -320,6 +328,8 @@ void SourceModBase::StartSourceMod(bool late)
 	{
 		g_pSourcePawn2->InstallWatchdogTimer(atoi(timeout) * 1000);
 	}
+
+	SH_ADD_HOOK(IServerGameDLL, Think, gamedll, SH_MEMBER(logicore.callbacks, &IProviderCallbacks::OnThink), false);
 }
 
 static bool g_LevelEndBarrier = false;
@@ -426,7 +436,7 @@ void SourceModBase::DoGlobalPluginLoads()
 	if ((game_ext = g_pGameConf->GetKeyValue("GameExtension")) != NULL)
 	{
 		char path[PLATFORM_MAX_PATH];
-		UTIL_Format(path, sizeof(path), "%s.ext." PLATFORM_LIB_EXT, game_ext);
+		ke::SafeSprintf(path, sizeof(path), "%s.ext." PLATFORM_LIB_EXT, game_ext);
 		extsys->LoadAutoExtension(path);
 	}
 
@@ -448,7 +458,7 @@ size_t SourceModBase::BuildPath(PathType type, char *buffer, size_t maxlength, c
 	 */
 	if (type != Path_SM_Rel && strncmp(_buffer, "file://", 7) == 0)
 	{
-		return g_LibSys.PathFormat(buffer, maxlength, "%s", &_buffer[7]);
+		return ke::path::Format(buffer, maxlength, "%s", &_buffer[7]);
 	}
 
 	const char *base = NULL;
@@ -467,11 +477,11 @@ size_t SourceModBase::BuildPath(PathType type, char *buffer, size_t maxlength, c
 
 	if (base)
 	{
-		return g_LibSys.PathFormat(buffer, maxlength, "%s/%s", base, _buffer);
+		return ke::path::Format(buffer, maxlength, "%s/%s", base, _buffer);
 	}
 	else
 	{
-		return g_LibSys.PathFormat(buffer, maxlength, "%s", _buffer);
+		return ke::path::Format(buffer, maxlength, "%s", _buffer);
 	}
 }
 
@@ -490,7 +500,7 @@ void SourceModBase::CloseSourceMod()
 	}
 
 	/* Rest In Peace */
-	ShutdownLogicBridge();
+	sCoreProviderImpl.ShutdownBridge();
 	ShutdownJIT();
 }
 
@@ -513,15 +523,7 @@ void SourceModBase::ShutdownServices()
 		pBase = pBase->m_pGlobalClassNext;
 	}
 
-	/* Delete all data packs */
-	CStack<CDataPack *>::iterator iter;
-	CDataPack *pd;
-	for (iter=m_freepacks.begin(); iter!=m_freepacks.end(); iter++)
-	{
-		pd = (*iter);
-		delete pd;
-	}
-	m_freepacks.popall();
+	sCoreProviderImpl.ShutdownHooks();
 
 	/* Notify! */
 	pBase = SMGlobalClass::head;
@@ -545,6 +547,7 @@ void SourceModBase::ShutdownServices()
 
 	SH_REMOVE_HOOK(IServerGameDLL, LevelShutdown, gamedll, SH_MEMBER(this, &SourceModBase::LevelShutdown), false);
 	SH_REMOVE_HOOK(IServerGameDLL, GameFrame, gamedll, SH_MEMBER(&g_Timers, &TimerSystem::GameFrame), false);
+	SH_REMOVE_HOOK(IServerGameDLL, Think, gamedll, SH_MEMBER(logicore.callbacks, &IProviderCallbacks::OnThink), false);
 }
 
 void SourceModBase::LogMessage(IExtension *pExt, const char *format, ...)
@@ -617,7 +620,7 @@ size_t SourceModBase::FormatString(char *buffer, size_t maxlength, IPluginContex
 
 	int lparam = ++param;
 
-	return atcprintf(buffer, maxlength, fmt, pContext, params, &lparam);
+	return logicore.atcprintf(buffer, maxlength, fmt, pContext, params, &lparam);
 }
 
 const char *SourceModBase::GetSourceModPath() const
@@ -644,26 +647,16 @@ unsigned int SourceModBase::GetGlobalTarget() const
 
 IDataPack *SourceModBase::CreateDataPack()
 {
-	CDataPack *pack;
-	if (m_freepacks.empty())
-	{
-		pack = new CDataPack;
-	} else {
-		pack = m_freepacks.front();
-		m_freepacks.pop();
-		pack->Initialize();
-	}
-	return pack;
+	return logicore.CreateDataPack();
 }
 
 void SourceModBase::FreeDataPack(IDataPack *pack)
 {
-	m_freepacks.push(static_cast<CDataPack *>(pack));
+	logicore.FreeDataPack(pack);
 }
 
 Handle_t SourceModBase::GetDataPackHandleType(bool readonly)
 {
-	//:TODO:
 	return 0;
 }
 
@@ -721,8 +714,6 @@ void SourceModBase::RemoveGameFrameHook(GAME_FRAME_HOOK hook)
 
 void SourceModBase::ProcessGameFrameHooks(bool simulating)
 {
-	SM_PROFILE("SourceModBase::ProcessGameFrameHooks");
-
 	if (m_frame_hooks.size() == 0)
 	{
 		return;
@@ -751,7 +742,7 @@ size_t SourceModBase::FormatArgs(char *buffer,
 								 const char *fmt,
 								 va_list ap)
 {
-	return UTIL_FormatArgs(buffer, maxlength, fmt, ap);
+	return ke::SafeVsprintf(buffer, maxlength, fmt, ap);
 }
 
 void SourceModBase::AddFrameAction(FRAMEACTION fn, void *data)
@@ -782,5 +773,29 @@ bool SourceModBase::IsMapRunning()
 	return g_OnMapStarted;
 }
 
-SMGlobalClass *SMGlobalClass::head = NULL;
+class ConVarRegistrar :
+	public IConCommandBaseAccessor,
+	public SMGlobalClass
+{
+public:
+	void OnSourceModStartup(bool late) override
+	{
+#if SOURCE_ENGINE >= SE_ORANGEBOX
+		g_pCVar = icvar;
+#endif
+		CONVAR_REGISTER(this);
+	}
 
+	bool RegisterConCommandBase(ConCommandBase *pCommand) override
+	{
+		META_REGCVAR(pCommand);
+
+		// Override values of convars created by SourceMod convar manager if
+		// specified on command line.
+		const char *cmdLineValue = icvar->GetCommandLineValue(pCommand->GetName());
+		if (cmdLineValue && !pCommand->IsCommand())
+			static_cast<ConVar *>(pCommand)->SetValue(cmdLineValue);
+
+		return true;
+	}
+} sConVarRegistrar;

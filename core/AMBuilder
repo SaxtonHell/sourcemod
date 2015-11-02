@@ -9,7 +9,6 @@ project.sources += [
   'sm_stringutil.cpp',
   'MenuVoting.cpp',
   'smn_events.cpp',
-  'CDataPack.cpp',
   'frame_hooks.cpp',
   'smn_nextmap.cpp',
   'sourcemm_api.cpp',
@@ -21,7 +20,6 @@ project.sources += [
   'NextMap.cpp',
   'ConCmdManager.cpp',
   'ConVarManager.cpp',
-  'LibrarySys.cpp',
   'PlayerManager.cpp',
   'TimerSys.cpp',
   'CoreConfig.cpp',
@@ -38,10 +36,10 @@ project.sources += [
   'EventManager.cpp',
   'MenuStyle_Radio.cpp',
   'sm_autonatives.cpp',
-  'sm_srvcmds.cpp',
   'ConsoleDetours.cpp',
   'vprof_tool.cpp',
   'smn_commandline.cpp',
+  'GameHooks.cpp',
 ]
 
 for sdk_name in SM.sdks:
@@ -50,6 +48,10 @@ for sdk_name in SM.sdks:
 
   binary = SM.HL2Config(project, binary_name, sdk)
   compiler = binary.compiler
+
+  compiler.cxxincludes += [
+    builder.sourcePath
+  ]
 
   if sdk.name == 'csgo':
     compiler.cxxincludes += [

@@ -1003,7 +1003,7 @@ static cell_t SetEntDataString(IPluginContext *pContext, const cell_t *params)
 	char *dest = (char *)((uint8_t *)pEntity + offset);
 
 	pContext->LocalToString(params[3], &src);
-	size_t len = strncopy(dest, src, params[4]);
+	size_t len = ke::SafeStrcpy(dest, params[4], src);
 
 	if (params[5] && (pEdict != NULL))
 	{
@@ -1924,18 +1924,24 @@ static cell_t GetEntPropString(IPluginContext *pContext, const cell_t *params)
 
 			bIsStringIndex = (td->fieldType != FIELD_CHARACTER);
 
-			if (bIsStringIndex && (element < 0 || element >= td->fieldSize))
+			if (element != 0)
 			{
-				return pContext->ThrowNativeError("Element %d is out of bounds (Prop %s has %d elements).",
-					element,
-					prop,
-					td->fieldSize);
-			}
-			else if (element != 0)
-			{
-				return pContext->ThrowNativeError("Prop %s is not an array. Element %d is invalid.",
-					prop,
-					element);
+				if (bIsStringIndex)
+				{
+					if (element < 0 || element >= td->fieldSize)
+					{
+						return pContext->ThrowNativeError("Element %d is out of bounds (Prop %s has %d elements).",
+							element,
+							prop,
+							td->fieldSize);
+					}
+				}
+				else
+				{
+					return pContext->ThrowNativeError("Prop %s is not an array. Element %d is invalid.",
+						prop,
+						element);
+				}
 			}
 
 			offset = info.actual_offset;
@@ -2061,6 +2067,27 @@ static cell_t SetEntPropString(IPluginContext *pContext, const cell_t *params)
 			offset = info.actual_offset;
 
 			bIsStringIndex = (td->fieldType != FIELD_CHARACTER);
+
+			if (element != 0)
+			{
+				if (bIsStringIndex)
+				{
+					if (element < 0 || element >= td->fieldSize)
+					{
+						return pContext->ThrowNativeError("Element %d is out of bounds (Prop %s has %d elements).",
+							element,
+							prop,
+							td->fieldSize);
+					}
+				}
+				else
+				{
+					return pContext->ThrowNativeError("Prop %s is not an array. Element %d is invalid.",
+						prop,
+						element);
+				}
+			}
+
 			if (bIsStringIndex)
 			{
 				offset += (element * (td->fieldSizeInBytes / td->fieldSize));
@@ -2138,7 +2165,7 @@ static cell_t SetEntPropString(IPluginContext *pContext, const cell_t *params)
 	else
 	{
 		char *dest = (char *) ((uint8_t *) pEntity + offset);
-		len = strncopy(dest, src, maxlen);
+		len = ke::SafeStrcpy(dest, maxlen, src);
 	}
 
 	if (params[2] == Prop_Send && (pEdict != NULL))

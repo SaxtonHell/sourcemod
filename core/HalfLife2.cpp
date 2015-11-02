@@ -38,10 +38,10 @@
 #include <IGameConfigs.h>
 #include <compat_wrappers.h>
 #include <Logger.h>
-#include "LibrarySys.h"
+#include <amtl/os/am-shared-library.h>
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
 #include <tier0/mem.h>
+#include <bridge/include/ILogger.h>
 
 #if SOURCE_ENGINE == SE_DOTA
 #include <game/shared/protobuf/usermessages.pb.h>
@@ -114,24 +114,10 @@ CHalfLife2::~CHalfLife2()
 CSharedEdictChangeInfo *g_pSharedChangeInfo = NULL;
 #endif
 
-#if !defined METAMOD_PLAPI_VERSION || PLAPI_VERSION < 11
-bool is_original_engine = false;
-#endif
-
 void CHalfLife2::OnSourceModStartup(bool late)
 {
 #if SOURCE_ENGINE != SE_DARKMESSIAH
-
-	/* The Ship currently is the only known game to use an older version of the engine */
-#if defined METAMOD_PLAPI_VERSION || PLAPI_VERSION >= 11
-	if (g_SMAPI->GetSourceEngineBuild() == SOURCE_ENGINE_ORIGINAL)
-#else
-	if (strcasecmp(g_SourceMod.GetGameFolderName(), "ship") == 0)
-#endif
-	{
-		is_original_engine = true;
-	}
-	else if (g_pSharedChangeInfo == NULL)
+	if (g_SMAPI->GetSourceEngineBuild() != SOURCE_ENGINE_ORIGINAL && !g_pSharedChangeInfo)
 	{
 		g_pSharedChangeInfo = engine->GetSharedEdictChangeInfo();
 	}
@@ -238,34 +224,32 @@ void CHalfLife2::InitCommandLine()
 {
 	char error[256];
 #if SOURCE_ENGINE != SE_DARKMESSIAH
-	if (!is_original_engine)
+	if (g_SMAPI->GetSourceEngineBuild() != SOURCE_ENGINE_ORIGINAL)
 	{
-		ke::AutoPtr<ILibrary> lib(g_LibSys.OpenLibrary(TIER0_NAME, error, sizeof(error)));
-		if (lib == NULL)
-		{
+		ke::Ref<ke::SharedLib> lib = ke::SharedLib::Open(TIER0_NAME, error, sizeof(error));
+		if (!lib) {
 			logger->LogError("Could not load %s: %s", TIER0_NAME, error);
 			return;
 		}
 		
-		m_pGetCommandLine = lib->GetSymbolAddress("CommandLine_Tier0");
+		m_pGetCommandLine = lib->get<decltype(m_pGetCommandLine)>("CommandLine_Tier0");
 
 		/* '_Tier0' dropped on Alien Swarm version */
 		if (m_pGetCommandLine == NULL)
 		{
-			m_pGetCommandLine = lib->GetSymbolAddress("CommandLine");
+			m_pGetCommandLine = lib->get<decltype(m_pGetCommandLine)>("CommandLine");
 		}
 	}
 	else
 #endif
 	{
-		ke::AutoPtr<ILibrary> lib(g_LibSys.OpenLibrary(VSTDLIB_NAME, error, sizeof(error)));
-		if (lib == NULL)
-		{
+		ke::Ref<ke::SharedLib> lib = ke::SharedLib::Open(VSTDLIB_NAME, error, sizeof(error));
+		if (!lib) {
 			logger->LogError("Could not load %s: %s", VSTDLIB_NAME, error);
 			return;
 		}
 
-		m_pGetCommandLine = lib->GetSymbolAddress("CommandLine");
+		m_pGetCommandLine = lib->get<decltype(m_pGetCommandLine)>("CommandLine");
 	}
 	
 	if (m_pGetCommandLine == NULL)
@@ -281,13 +265,6 @@ ICommandLine *CHalfLife2::GetValveCommandLine()
 
 	return ((FakeGetCommandLine)((FakeGetCommandLine *)m_pGetCommandLine))();
 }
-
-#if !defined METAMOD_PLAPI_VERSION || PLAPI_VERSION < 11
-bool CHalfLife2::IsOriginalEngine()
-{
-	return is_original_engine;
-}
-#endif
 
 #if SOURCE_ENGINE != SE_DARKMESSIAH
 IChangeInfoAccessor *CBaseEdict::GetChangeAccessor()
@@ -305,8 +282,6 @@ bool UTIL_FindInSendTable(SendTable *pTable,
 						  sm_sendprop_info_t *info,
 						  unsigned int offset)
 {
-	SM_PROFILE("UTIL_FindInSendTable");
-
 	const char *pname;
 	int props = pTable->GetNumProps();
 	SendProp *prop;
@@ -339,8 +314,6 @@ bool UTIL_FindInSendTable(SendTable *pTable,
 
 bool UTIL_FindDataMapInfo(datamap_t *pMap, const char *name, sm_datatable_info_t *pDataTable)
 {
-	SM_PROFILE("UTIL_FindDataMapInfo");
-
 	while (pMap)
 	{
 		for (int i = 0; i < pMap->dataNumFields; ++i)
@@ -382,8 +355,6 @@ ServerClass *CHalfLife2::FindServerClass(const char *classname)
 
 DataTableInfo *CHalfLife2::_FindServerClass(const char *classname)
 {
-	SM_PROFILE("CHalfLife2::_FindServerClass");
-
 	DataTableInfo *pInfo = NULL;
 	if (!m_Classes.retrieve(classname, &pInfo))
 	{
@@ -407,8 +378,6 @@ DataTableInfo *CHalfLife2::_FindServerClass(const char *classname)
 
 bool CHalfLife2::FindSendPropInfo(const char *classname, const char *offset, sm_sendprop_info_t *info)
 {
-	SM_PROFILE("CHalfLife2::FindSendPropInfo");
-
 	DataTableInfo *pInfo;
 
 	if ((pInfo = _FindServerClass(classname)) == NULL)
@@ -458,8 +427,6 @@ typedescription_t *CHalfLife2::FindInDataMap(datamap_t *pMap, const char *offset
 
 bool CHalfLife2::FindDataMapInfo(datamap_t *pMap, const char *offset, sm_datatable_info_t *pDataTable)
 {
-	SM_PROFILE("CHalfLife2::FindDataMapInfo");
-
 	DataTableMap::Insert i = m_Maps.findForAdd(pMap);
 	if (!i.found())
 		m_Maps.add(i, pMap, new DataMapCache());
@@ -512,7 +479,7 @@ bool CHalfLife2::TextMsg(int client, int dest, const char *msg)
 		if (chat_saytext != NULL && strcmp(chat_saytext, "yes") == 0)
 		{
 			char buffer[253];
-			UTIL_Format(buffer, sizeof(buffer), "%s\1\n", msg);
+			ke::SafeSprintf(buffer, sizeof(buffer), "%s\1\n", msg);
 
 #if SOURCE_ENGINE == SE_DOTA
 			CUserMsg_SayText *pMsg;
@@ -765,8 +732,6 @@ void CHalfLife2::AddToFakeCliCmdQueue(int client, int userid, const char *cmd)
 
 void CHalfLife2::ProcessFakeCliCmdQueue()
 {
-	SM_PROFILE("CHalfLife2::ProcessFakeCliCmdQueue");
-
 	while (!m_CmdQueue.empty())
 	{
 		DelayedFakeCliCmd *pFake = m_CmdQueue.first();
@@ -800,13 +765,7 @@ bool CHalfLife2::IsLANServer()
 
 bool CHalfLife2::KVLoadFromFile(KeyValues *kv, IBaseFileSystem *filesystem, const char *resourceName, const char *pathID)
 {
-	SM_PROFILE("CHalfLife2::KVLoadFromFile");
-
-#if defined METAMOD_PLAPI_VERSION || PLAPI_VERSION >= 11
 	if (g_SMAPI->GetSourceEngineBuild() == SOURCE_ENGINE_ORIGINAL)
-#else
-	if (strcasecmp(g_SourceMod.GetGameFolderName(), "ship") == 0)
-#endif
 	{
 		Assert(filesystem);
 #ifdef _MSC_VER
@@ -841,19 +800,19 @@ bool CHalfLife2::KVLoadFromFile(KeyValues *kv, IBaseFileSystem *filesystem, cons
 	}
 }
 
-void CHalfLife2::PushCommandStack(const CCommand *cmd)
+void CHalfLife2::PushCommandStack(const ICommandArgs *cmd)
 {
 	CachedCommandInfo info;
 
 	info.args = cmd;
 #if SOURCE_ENGINE <= SE_DARKMESSIAH
-	strncopy(info.cmd, cmd->Arg(0), sizeof(info.cmd));
+	ke::SafeStrcpy(info.cmd, sizeof(info.cmd), cmd->Arg(0));
 #endif
 
 	m_CommandStack.push(info);
 }
 
-const CCommand *CHalfLife2::PeekCommandStack()
+const ICommandArgs *CHalfLife2::PeekCommandStack()
 {
 	if (m_CommandStack.empty())
 	{
@@ -891,15 +850,13 @@ void CHalfLife2::AddDelayedKick(int client, int userid, const char *msg)
 
 	kick.client = client;
 	kick.userid = userid;
-	UTIL_Format(kick.buffer, sizeof(kick.buffer), "%s", msg);
+	ke::SafeSprintf(kick.buffer, sizeof(kick.buffer), "%s", msg);
 
 	m_DelayedKicks.push(kick);
 }
 
 void CHalfLife2::ProcessDelayedKicks()
 {
-	SM_PROFILE("CHalfLife2::ProcessDelayedKicks");
-
 	while (!m_DelayedKicks.empty())
 	{
 		DelayedKickInfo info = m_DelayedKicks.first();
@@ -1225,8 +1182,15 @@ const char *CHalfLife2::GetEntityClassname(CBaseEntity *pEntity)
 	return *(const char **)(((unsigned char *)pEntity) + offset);
 }
 
-SMFindMapResult CHalfLife2::FindMap(char *pMapName, int nMapNameMax)
+SMFindMapResult CHalfLife2::FindMap(char *pMapName, size_t nMapNameMax)
 {
+	return this->FindMap(pMapName, pMapName, nMapNameMax);
+}
+
+SMFindMapResult CHalfLife2::FindMap(const char *pMapName, char *pFoundMap, size_t nMapNameMax)
+{
+	ke::SafeStrcpy(pFoundMap, nMapNameMax, pMapName);
+
 #if SOURCE_ENGINE >= SE_LEFT4DEAD
 	static char mapNameTmp[PLATFORM_MAX_PATH];
 	g_SourceMod.Format(mapNameTmp, sizeof(mapNameTmp), "maps%c%s.bsp", PLATFORM_SEP_CHAR, pMapName);
@@ -1265,14 +1229,58 @@ SMFindMapResult CHalfLife2::FindMap(char *pMapName, int nMapNameMax)
 	}
 	else
 	{
-		strncopy(pMapName, &results[0][helperCmdLen + 1], nMapNameMax);
+		ke::SafeStrcpy(pFoundMap, nMapNameMax, &results[0][helperCmdLen + 1]);
 		return SMFindMapResult::FuzzyMatch;
 	}
+
 #elif SOURCE_ENGINE == SE_TF2
-	return static_cast<SMFindMapResult>(engine->FindMap(pMapName, nMapNameMax));
+	static char szTemp[PLATFORM_MAX_PATH];
+	if (pFoundMap == NULL)
+	{
+		ke::SafeStrcpy(szTemp, SM_ARRAYSIZE(szTemp), pMapName);
+		pFoundMap = szTemp;
+		nMapNameMax = 0;
+	}
+
+	return static_cast<SMFindMapResult>(engine->FindMap(pFoundMap, static_cast<int>(nMapNameMax)));
+#elif SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_SDK2013
+	static IVEngineServer *engine21 = (IVEngineServer *)(g_SMAPI->GetEngineFactory()("VEngineServer021", nullptr));
+	return engine21->IsMapValid(pMapName) == 0 ? SMFindMapResult::NotFound : SMFindMapResult::Found;
 #else
 	return engine->IsMapValid(pMapName) == 0 ? SMFindMapResult::NotFound : SMFindMapResult::Found;
 #endif
+}
+
+bool CHalfLife2::GetMapDisplayName(const char *pMapName, char *pDisplayname, size_t nMapNameMax)
+{
+	SMFindMapResult result = FindMap(pMapName, pDisplayname, nMapNameMax);
+
+	if (result == SMFindMapResult::NotFound)
+	{
+		return false;
+	}
+
+#if SOURCE_ENGINE == SE_CSGO
+	char *lastSlashPos;
+	// In CSGO, workshop maps show up as workshop/123456789/mapname
+	if (strncmp(pDisplayname, "workshop/", 9) == 0 && (lastSlashPos = strrchr(pDisplayname, '/')) != NULL)
+	{
+		ke::SafeSprintf(pDisplayname, nMapNameMax, "%s", &lastSlashPos[1]);
+		return true;
+	}
+#elif SOURCE_ENGINE == SE_TF2
+	char *ugcPos;
+	// In TF2, workshop maps show up as workshop/mapname.ugc123456789
+	if (strncmp(pDisplayname, "workshop/", 9) == 0 && (ugcPos = strstr(pDisplayname, ".ugc")) != NULL)
+	{
+		// Overwrite the . with a nul and SafeSprintf will handle the rest
+		ugcPos[0] = '\0';
+		ke::SafeSprintf(pDisplayname, nMapNameMax, "%s", &pDisplayname[9]);
+		return true;
+	}
+#endif
+
+	return true;
 }
 
 bool CHalfLife2::IsMapValid(const char *map)
@@ -1280,10 +1288,7 @@ bool CHalfLife2::IsMapValid(const char *map)
 	if (!map || !map[0])
 		return false;
 	
-	static char szTmp[PLATFORM_MAX_PATH];
-	strncopy(szTmp, map, sizeof(szTmp));
-
-	return FindMap(szTmp, sizeof(szTmp)) != SMFindMapResult::NotFound;
+	return FindMap(map) != SMFindMapResult::NotFound;
 }
 
 // TODO: Add ep1 support for this. (No IServerTools available there)

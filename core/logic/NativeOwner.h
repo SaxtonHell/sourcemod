@@ -37,6 +37,7 @@
 #include <am-vector.h>
 #include "common_logic.h"
 #include "Native.h"
+#include <bridge/include/IScriptManager.h>
 
 struct Native;
 class CPlugin;
@@ -68,7 +69,6 @@ public:
 public:
 	void SetMarkSerial(unsigned int serial);
 	unsigned int GetMarkSerial();
-	void PropagateMarkSerial(unsigned int serial);
 public:
 	void AddDependent(CPlugin *pPlugin);
 	void AddWeakRef(const WeakNative & ref);

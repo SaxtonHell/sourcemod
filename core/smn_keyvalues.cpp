@@ -38,7 +38,6 @@
 #include <KeyValues.h>
 #include "utlbuffer.h"
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
 
 HandleType_t g_KeyValueType;
 
@@ -267,7 +266,7 @@ static cell_t smn_KvSetVector(IPluginContext *pCtx, const cell_t *params)
 	pCtx->LocalToStringNULL(params[2], &key);
 	pCtx->LocalToPhysAddr(params[3], &vector);
 
-	UTIL_Format(buffer, sizeof(buffer), "%f %f %f", sp_ctof(vector[0]), sp_ctof(vector[1]), sp_ctof(vector[2]));
+	ke::SafeSprintf(buffer, sizeof(buffer), "%f %f %f", sp_ctof(vector[0]), sp_ctof(vector[1]), sp_ctof(vector[2]));
 
 	pStk->pCurRoot.front()->SetString(key, buffer);
 
@@ -438,7 +437,7 @@ static cell_t smn_KvGetVector(IPluginContext *pCtx, const cell_t *params)
 	pCtx->LocalToPhysAddr(params[3], &outvector);
 	pCtx->LocalToPhysAddr(params[4], &defvector);
 
-	UTIL_Format(buffer, sizeof(buffer), "%f %f %f", sp_ctof(defvector[0]), sp_ctof(defvector[1]), sp_ctof(defvector[2]));
+	ke::SafeSprintf(buffer, sizeof(buffer), "%f %f %f", sp_ctof(defvector[0]), sp_ctof(defvector[1]), sp_ctof(defvector[2]));
 
 	value = pStk->pCurRoot.front()->GetString(key, buffer);
 
@@ -507,8 +506,6 @@ static cell_t smn_CreateKeyValues(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_KvJumpToKey(IPluginContext *pCtx, const cell_t *params)
 {
-	SM_PROFILE("smn_KvJumpToKey");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -539,8 +536,6 @@ static cell_t smn_KvJumpToKey(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_KvJumpToKeySymbol(IPluginContext *pCtx, const cell_t *params)
 {
-	SM_PROFILE("smn_KvJumpToKeySymbol");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -660,8 +655,6 @@ static cell_t smn_KvGoBack(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_KvRewind(IPluginContext *pCtx, const cell_t *params)
 {
-	SM_PROFILE("smn_KvRewind");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -760,8 +753,6 @@ static cell_t smn_KvGetDataType(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_KeyValuesToFile(IPluginContext *pCtx, const cell_t *params)
 {
-	SM_PROFILE("smn_KeyValuesToFile");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -784,8 +775,6 @@ static cell_t smn_KeyValuesToFile(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_FileToKeyValues(IPluginContext *pCtx, const cell_t *params)
 {
-	SM_PROFILE("smn_FileToKeyValues");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -876,8 +865,6 @@ static cell_t smn_KvNodesInStack(IPluginContext *pCtx, const cell_t *params)
 
 static cell_t smn_KvDeleteThis(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_KvDeleteThis");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;
@@ -996,8 +983,6 @@ static cell_t smn_KvSavePosition(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_CopySubkeys(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_CopySubkeys");
-
 	Handle_t hndl_copied = static_cast<Handle_t>(params[1]);
 	Handle_t hndl_parent = static_cast<Handle_t>(params[2]);
 	HandleError herr;
@@ -1061,8 +1046,6 @@ static cell_t smn_GetNameSymbol(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_FindKeyById(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_FindKeyById");
-
 	Handle_t hndl = static_cast<Handle_t>(params[1]);
 	HandleError herr;
 	HandleSecurity sec;

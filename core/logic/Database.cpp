@@ -36,6 +36,7 @@
 #include "PluginSys.h"
 #include <stdlib.h>
 #include <IThreader.h>
+#include <bridge/include/ILogger.h>
 
 #define DBPARSE_LEVEL_NONE		0
 #define DBPARSE_LEVEL_MAIN		1
@@ -683,7 +684,7 @@ void DBManager::OnSourceModIdentityDropped(IdentityToken_t *pToken)
 	s_pAddBlock = NULL;
 }
 
-void DBManager::OnPluginUnloaded(IPlugin *plugin)
+void DBManager::OnPluginWillUnload(IPlugin *plugin)
 {
 	/* Kill the thread so we can flush everything into the think queue... */
 	KillWorkerThread();
@@ -709,9 +710,7 @@ void DBManager::OnPluginUnloaded(IPlugin *plugin)
 		}
 	}
 
-	for (iter = templist.begin();
-		 iter != templist.end();
-		 iter++)
+	for (iter = templist.begin(); iter != templist.end(); iter++)
 	{
 		IDBThreadOperation *op = (*iter);
 		op->RunThinkPart();

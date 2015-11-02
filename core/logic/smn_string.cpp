@@ -35,7 +35,8 @@
 #include <ITextParsers.h>
 #include <ctype.h>
 #include "stringutil.h"
-#include "ProfileTools.h"
+#include "sprintf.h"
+#include <am-string.h>
 
 inline const char *_strstr(const char *str, const char *substr)
 {
@@ -142,7 +143,7 @@ static cell_t sm_numtostr(IPluginContext *pCtx, const cell_t *params)
 {
 	char *str;
 	pCtx->LocalToString(params[2], &str);
-	size_t res = smcore.Format(str, params[3], "%d", params[1]);
+	size_t res = ke::SafeSprintf(str, params[3], "%d", params[1]);
 
 	return static_cast<cell_t>(res);
 }
@@ -175,7 +176,7 @@ static cell_t sm_floattostr(IPluginContext *pCtx, const cell_t *params)
 {
 	char *str;
 	pCtx->LocalToString(params[2], &str);
-	size_t res = smcore.Format(str, params[3], "%f", sp_ctof(params[1]));
+	size_t res = ke::SafeSprintf(str, params[3], "%f", sp_ctof(params[1]));
 
 	return static_cast<cell_t>(res);
 }
@@ -188,7 +189,7 @@ static cell_t sm_formatex(IPluginContext *pCtx, const cell_t *params)
 
 	pCtx->LocalToString(params[1], &buf);
 	pCtx->LocalToString(params[3], &fmt);
-	res = smcore.atcprintf(buf, static_cast<size_t>(params[2]), fmt, pCtx, params, &arg);
+	res = atcprintf(buf, static_cast<size_t>(params[2]), fmt, pCtx, params, &arg);
 
 	return static_cast<cell_t>(res);
 }
@@ -257,7 +258,7 @@ static cell_t sm_format(IPluginContext *pCtx, const cell_t *params)
 	}
 
 	buf = (copy) ? __copy_buf : destbuf;
-	res = smcore.atcprintf(buf, maxlen, fmt, pCtx, params, &arg);
+	res = atcprintf(buf, maxlen, fmt, pCtx, params, &arg);
 
 	if (copy)
 	{
@@ -307,7 +308,7 @@ static cell_t sm_vformat(IPluginContext *pContext, const cell_t *params)
 
 	pContext->LocalToString(params[3], &format);
 
-	size_t total = smcore.atcprintf(destination, maxlen, format, pContext, local_params, &vargPos);
+	size_t total = atcprintf(destination, maxlen, format, pContext, local_params, &vargPos);
 
 	/* Perform copy-on-write if we need to */
 	if (copy)
@@ -321,8 +322,6 @@ static cell_t sm_vformat(IPluginContext *pContext, const cell_t *params)
 /* :TODO: make this UTF8 safe */
 static cell_t BreakString(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("BreakString");
-
 	const char *input;
 	char *out;
 	size_t outMax;

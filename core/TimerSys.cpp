@@ -35,7 +35,6 @@
 #include "frame_hooks.h"
 #include "ConVarManager.h"
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
 
 #define TIMER_MIN_ACCURACY		0.01
 
@@ -211,8 +210,6 @@ void TimerSystem::OnSourceModLevelEnd()
 
 void TimerSystem::GameFrame(bool simulating)
 {
-	SM_PROFILE("TimerSystem::GameFrame");
-
 	if (simulating && m_bHasMapTickedYet)
 	{
 		g_fUniversalTime += gpGlobals->curtime - m_fLastTickedTime;
@@ -247,8 +244,6 @@ void TimerSystem::GameFrame(bool simulating)
 
 void TimerSystem::RunFrame()
 {
-	SM_PROFILE("TimerSystem::RunFrame");
-
 	ITimer *pTimer;
 	TimerIter iter;
 

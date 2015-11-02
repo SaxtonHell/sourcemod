@@ -223,7 +223,7 @@ methodmap DBResultSet < Handle
 	// @param field        The field index (starting from 0).
 	// @return             True if data is NULL, false otherwise.
 	// @error              Invalid field index, or no current result set.
-	public native bool IsFieldNull(Handle query, int field);
+	public native bool IsFieldNull(int field);
 
 	// Returns the length of a field's data in the current row of a result
 	// set.  This only needs to be called for strings to determine how many
@@ -236,14 +236,26 @@ methodmap DBResultSet < Handle
 	public native int FetchSize(int field);
 };
 
-// Callback for a successful transaction.
-// 
-// @param db            Database handle.
-// @param data          Data value passed to SQL_ExecuteTransaction().
-// @param numQueries    Number of queries executed in the transaction.
-// @param results       An array of Query handle results, one for each of numQueries. They are closed automatically.
-// @param queryData     An array of each data value passed to SQL_AddQuery().
-typedef SQLTxnSuccess = function void (Database db, any data, int numQueries, Handle[] results, any[] queryData);
+typeset SQLTxnSuccess
+{
+	// Callback for a successful transaction.
+	// 
+	// @param db            Database handle.
+	// @param data          Data value passed to SQL_ExecuteTransaction().
+	// @param numQueries    Number of queries executed in the transaction.
+	// @param results       An array of Query handle results, one for each of numQueries. They are closed automatically.
+	// @param queryData     An array of each data value passed to SQL_AddQuery().
+	function void (Database db, any data, int numQueries, Handle[] results, any[] queryData);
+	
+	// Callback for a successful transaction.
+	// 
+	// @param db            Database handle.
+	// @param data          Data value passed to SQL_ExecuteTransaction().
+	// @param numQueries    Number of queries executed in the transaction.
+	// @param results       An array of DBResultSet results, one for each of numQueries. They are closed automatically.
+	// @param queryData     An array of each data value passed to SQL_AddQuery().
+	function void (Database db, any data, int numQueries, DBResultSet[] results, any[] queryData);	
+}
 
 // Callback for a failed transaction.
 //
@@ -376,7 +388,7 @@ methodmap Database < Handle
 	//
 	// The database handle returned through the callback is always a new Handle,
 	// and if necessary, IsSameConnection() should be used to test against other
-	// conenctions.
+	// connections.
 	//
 	// The result handle returned through the callback is temporary and destroyed 
 	// at the end of the callback.
@@ -438,7 +450,7 @@ stock Database SQL_DefConnect(char[] error, int maxlength, bool persistent=true)
  * Connects to a database using key value pairs containing the database info.
  * The key/value pairs should match what would be in databases.cfg.
  *
- * I.e. "driver" should be "default" or a driver name (or ommitted for 
+ * I.e. "driver" should be "default" or a driver name (or omitted for 
  * the default).  For SQLite, only the "database" parameter is needed in addition.
  * For drivers which require external connections, more of the parameters may be 
  * needed.
@@ -991,7 +1003,7 @@ native void SQL_TConnect(SQLTCallback callback, const char[] name="default", any
  *
  * The database Handle returned through the callback is always a new Handle,
  * and if necessary, SQL_IsSameConnection() should be used to test against
- * other conenctions.
+ * other connections.
  *
  * The query Handle returned through the callback is temporary and destroyed 
  * at the end of the callback.  If you need to hold onto it, use CloneHandle().

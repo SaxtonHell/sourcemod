@@ -32,10 +32,11 @@
 #ifndef _INCLUDE_SOURCEMOD_CLOGGER_H_
 #define _INCLUDE_SOURCEMOD_CLOGGER_H_
 
+#include "common_logic.h"
 #include <stdio.h>
 #include <sh_string.h>
-
-#include "common_logic.h"
+#include <IForwardSys.h>
+#include <bridge/include/ILogger.h>
 
 using namespace SourceHook;
 

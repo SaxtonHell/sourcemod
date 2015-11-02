@@ -40,6 +40,7 @@
 #endif
 #include <ISourceMod.h>
 #include <stdlib.h>
+#include <bridge/include/IScriptManager.h>
 
 #if defined CreateMenu
 #undef CreateMenu

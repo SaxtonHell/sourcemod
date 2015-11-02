@@ -40,6 +40,7 @@
 #include <IRootConsoleMenu.h>
 #include <IAdminSystem.h>
 #include "concmd_cleaner.h"
+#include "GameHooks.h"
 #include <sm_stringhashmap.h>
 #include <am-utility.h>
 #include <am-inlinelist.h>
@@ -105,6 +106,7 @@ struct ConCmdInfo
 	ConCommand *pCmd;				/**< Pointer to the command itself */
 	CmdHookList hooks;				/**< Hook list */
 	FlagBits eflags;				/**< Effective admin flags */
+	ke::Ref<CommandHook> sh_hook;   /**< SourceHook hook, if any. */
 };
 
 typedef List<ConCmdInfo *> ConCmdList;
@@ -115,13 +117,7 @@ class ConCmdManager :
 	public IPluginsListener,
 	public IConCommandTracker
 {
-#if SOURCE_ENGINE == SE_DOTA
-	friend void CommandCallback(const CCommandContext &context, const CCommand &command);
-#elif SOURCE_ENGINE >= SE_ORANGEBOX
-	friend void CommandCallback(const CCommand &command);
-#else
-	friend void CommandCallback();
-#endif
+	friend void CommandCallback(DISPATCH_ARGS);
 public:
 	ConCmdManager();
 	~ConCmdManager();
@@ -131,9 +127,9 @@ public: //SMGlobalClass
 public: //IPluginsListener
 	void OnPluginDestroyed(IPlugin *plugin);
 public: //IRootConsoleCommand
-	void OnRootConsoleCommand(const char *cmdname, const CCommand &command);
+	void OnRootConsoleCommand(const char *cmdname, const ICommandArgs *command) override;
 public: //IConCommandTracker
-	void OnUnlinkConCommandBase(ConCommandBase *pBase, const char *name, bool is_read_safe);
+	void OnUnlinkConCommandBase(ConCommandBase *pBase, const char *name) override;
 public:
 	bool AddServerCommand(IPluginFunction *pFunction, const char *name, const char *description, int flags);
 	bool AddAdminCommand(IPluginFunction *pFunction, 
@@ -147,12 +143,11 @@ public:
 	bool LookForSourceModCommand(const char *cmd);
 	bool LookForCommandAdminFlags(const char *cmd, FlagBits *pFlags);
 private:
-	void InternalDispatch(const CCommand &command);
+	bool InternalDispatch(int client, const ICommandArgs *args);
 	ResultType RunAdminCommand(ConCmdInfo *pInfo, int client, int args);
 	ConCmdInfo *AddOrFindCommand(const char *name, const char *description, int flags);
-	void SetCommandClient(int client);
 	void AddToCmdList(ConCmdInfo *info);
-	void RemoveConCmd(ConCmdInfo *info, const char *cmd, bool is_read_safe, bool untrack);
+	void RemoveConCmd(ConCmdInfo *info, const char *cmd, bool untrack);
 	bool CheckAccess(int client, const char *cmd, AdminCmdInfo *pAdmin);
 
 	// Case insensitive
@@ -161,10 +156,6 @@ private:
 	// Case sensitive
 	ConCmdInfo *FindInTrie(const char *name);
 public:
-	inline int GetCommandClient()
-	{
-		return m_CmdClient;
-	}
 	inline const List<ConCmdInfo *> & GetCommandList()
 	{
 		return m_CmdList;
@@ -175,7 +166,6 @@ private:
 	StringHashMap<ConCmdInfo *> m_Cmds; /* command lookup */
 	GroupMap m_CmdGrps;				/* command group map */
 	ConCmdList m_CmdList;			/* command list */
-	int m_CmdClient;				/* current client */
 };
 
 extern ConCmdManager g_ConCmds;

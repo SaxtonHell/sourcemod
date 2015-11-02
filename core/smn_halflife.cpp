@@ -71,10 +71,23 @@ static cell_t FindMap(IPluginContext *pContext, const cell_t *params)
 {
 	char *pMapname;
 	pContext->LocalToString(params[1], &pMapname);
-		
-	cell_t size = params[2];
-	
-	return static_cast<cell_t>(g_HL2.FindMap(pMapname, size));
+
+	if (params[0] == 2)
+	{
+		return static_cast<cell_t>(g_HL2.FindMap(pMapname, params[2]));
+	}
+
+	char *pDestMap;
+	pContext->LocalToString(params[2], &pDestMap);
+	return static_cast<cell_t>(g_HL2.FindMap(pMapname, pDestMap, params[3]));
+}
+
+static cell_t GetMapDisplayName(IPluginContext *pContext, const cell_t *params)
+{
+	char *pMapname, *pDisplayname;
+	pContext->LocalToString(params[1], &pMapname);
+	pContext->LocalToString(params[2], &pDisplayname);
+	return static_cast<cell_t>(g_HL2.GetMapDisplayName(pMapname, pDisplayname, params[3]));
 }
 
 static cell_t IsDedicatedServer(IPluginContext *pContext, const cell_t *params)
@@ -482,7 +495,6 @@ static cell_t smn_IsPlayerAlive(IPluginContext *pContext, const cell_t *params)
 
 static cell_t GuessSDKVersion(IPluginContext *pContext, const cell_t *params)
 {
-#if defined METAMOD_PLAPI_VERSION || PLAPI_VERSION >= 11
 	int version = g_SMAPI->GetSourceEngineBuild();
 
 	switch (version)
@@ -492,7 +504,7 @@ static cell_t GuessSDKVersion(IPluginContext *pContext, const cell_t *params)
 	case SOURCE_ENGINE_EPISODEONE:
 		return 20;
 
-# if defined METAMOD_PLAPI_VERSION
+#if defined METAMOD_PLAPI_VERSION
 	/* Newer games. */
 	case SOURCE_ENGINE_DARKMESSIAH:
 		return 15;
@@ -525,18 +537,8 @@ static cell_t GuessSDKVersion(IPluginContext *pContext, const cell_t *params)
 		return 80;
 	case SOURCE_ENGINE_DOTA:
 		return 90;
-# endif
-	}
-#else
-	if (g_HL2.IsOriginalEngine())
-	{
-		return 10;
-	}
-	else
-	{
-		return 20;
-	}
 #endif
+	}
 
 	return 0;
 }
@@ -674,6 +676,7 @@ REGISTER_NATIVES(halflifeNatives)
 	{"IsDedicatedServer",		IsDedicatedServer},
 	{"IsMapValid",				IsMapValid},
 	{"FindMap",					FindMap},
+	{"GetMapDisplayName",		GetMapDisplayName},
 	{"SetFakeClientConVar",		SetFakeClientConVar},
 	{"SetRandomSeed",			SetRandomSeed},
 	{"PrecacheModel",			PrecacheModel},

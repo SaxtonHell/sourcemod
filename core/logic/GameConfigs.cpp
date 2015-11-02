@@ -42,6 +42,9 @@
 #include "common_logic.h"
 #include "sm_crc32.h"
 #include "MemoryUtils.h"
+#include <am-string.h>
+#include <bridge/include/ILogger.h>
+#include <bridge/include/CoreProvider.h>
 
 #if defined PLATFORM_POSIX
 #include <dlfcn.h>
@@ -150,7 +153,7 @@ CGameConfig::CGameConfig(const char *file, const char *engine)
 	m_CustomHandler = NULL;
 
 	if (!engine)
-		m_pEngine = smcore.GetSourceEngineName();
+		m_pEngine = bridge->GetSourceEngineName();
 	else
 		m_pEngine = engine;
 
@@ -271,7 +274,7 @@ SMCResult CGameConfig::ReadSMC_NewSection(const SMCStates *states, const char *n
 			error[0] = '\0';
 			if (strcmp(name, "server") != 0)
 			{
-				smcore.Format(error, sizeof(error), "Unrecognized library \"%s\"", name);
+				ke::SafeSprintf(error, sizeof(error), "Unrecognized library \"%s\"", name);
 			} 
 			else if (!s_ServerBinCRC_Ok)
 			{
@@ -281,7 +284,7 @@ SMCResult CGameConfig::ReadSMC_NewSection(const SMCStates *states, const char *n
 				g_pSM->BuildPath(Path_Game, path, sizeof(path), "bin/" PLATFORM_SERVER_BINARY);
 				if ((fp = fopen(path, "rb")) == NULL)
 				{
-					smcore.Format(error, sizeof(error), "Could not open binary: %s", path);
+					ke::SafeSprintf(error, sizeof(error), "Could not open binary: %s", path);
 				} else {
 					size_t size;
 					void *buffer;
@@ -547,11 +550,11 @@ SMCResult CGameConfig::ReadSMC_LeavingSection(const SMCStates *states)
 			void *addrInBase = NULL;
 			if (strcmp(s_TempSig.library, "server") == 0)
 			{
-				addrInBase = smcore.serverFactory;
+				addrInBase = bridge->serverFactory;
 			} else if (strcmp(s_TempSig.library, "engine") == 0) {
-				addrInBase = smcore.engineFactory;
+				addrInBase = bridge->engineFactory;
 			} else if (strcmp(s_TempSig.library, "matchmaking_ds") == 0) {
-				addrInBase = smcore.matchmakingDSFactory;
+				addrInBase = bridge->matchmakingDSFactory;
 			}
 			void *final_addr = NULL;
 			if (addrInBase == NULL)
@@ -579,7 +582,7 @@ SMCResult CGameConfig::ReadSMC_LeavingSection(const SMCStates *states)
 						void *handle = dlopen(info.dli_fname, RTLD_NOW);
 						if (handle)
 						{
-							if (smcore.SymbolsAreHidden())
+							if (bridge->SymbolsAreHidden())
 								final_addr = g_MemUtils.ResolveSymbol(handle, &s_TempSig.sig[1]);
 							else
 								final_addr = dlsym(handle, &s_TempSig.sig[1]);
@@ -791,7 +794,7 @@ bool CGameConfig::Reparse(char *error, size_t maxlength)
 	if (!libsys->PathExists(path))
 	{
 		/* Nope, use the old mechanism. */
-		smcore.Format(path, sizeof(path), "%s.txt", m_File);
+		ke::SafeSprintf(path, sizeof(path), "%s.txt", m_File);
 		if (!EnterFile(path, error, maxlength))
 		{
 			return false;
@@ -801,7 +804,7 @@ bool CGameConfig::Reparse(char *error, size_t maxlength)
 		g_pSM->BuildPath(Path_SM, path, sizeof(path), "gamedata/custom/%s.txt", m_File);
 		if (libsys->PathExists(path))
 		{
-			smcore.Format(path, sizeof(path), "custom/%s.txt", m_File);
+			ke::SafeSprintf(path, sizeof(path), "custom/%s.txt", m_File);
 			return EnterFile(path, error, maxlength);
 		}
 		return true;
@@ -841,7 +844,7 @@ bool CGameConfig::Reparse(char *error, size_t maxlength)
 	List<String>::iterator iter;
 	for (iter = fileList.begin(); iter != fileList.end(); iter++)
 	{
-		smcore.Format(path, sizeof(path), "%s/%s", m_File, (*iter).c_str());
+		ke::SafeSprintf(path, sizeof(path), "%s/%s", m_File, (*iter).c_str());
 		if (!EnterFile(path, error, maxlength))
 		{
 			return false;
@@ -875,7 +878,7 @@ bool CGameConfig::Reparse(char *error, size_t maxlength)
 			continue;	
 		}
 
-		smcore.Format(path, sizeof(path), "%s/custom/%s", m_File, curFile);
+		ke::SafeSprintf(path, sizeof(path), "%s/custom/%s", m_File, curFile);
 		if (!EnterFile(path, error, maxlength))
 		{
 			libsys->CloseDirectory(customDir);
@@ -1038,8 +1041,8 @@ void GameConfigManager::OnSourceModStartup(bool late)
 	LoadGameConfigFile("core.games", &g_pGameConf, NULL, 0);
 
 	strncopy(g_Game, g_pSM->GetGameFolderName(), sizeof(g_Game));
-	strncopy(g_GameDesc + 1, smcore.GetGameDescription(), sizeof(g_GameDesc) - 1);
-	smcore.GetGameName(g_GameName + 1, sizeof(g_GameName) - 1);
+	strncopy(g_GameDesc + 1, bridge->GetGameDescription(), sizeof(g_GameDesc) - 1);
+	bridge->GetGameName(g_GameName + 1, sizeof(g_GameName) - 1);
 }
 
 void GameConfigManager::OnSourceModAllInitialized()

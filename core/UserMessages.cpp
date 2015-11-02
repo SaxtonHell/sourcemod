@@ -32,13 +32,13 @@
 #include "UserMessages.h"
 #include "sm_stringutil.h"
 #include "logic_bridge.h"
-#include "sm_profiletool.h"
 
 #if SOURCE_ENGINE == SE_DOTA
 #include <dota_usermessage_helpers.h>
 #elif SOURCE_ENGINE == SE_CSGO
 #include <cstrike15_usermessage_helpers.h>
 #endif
+#include <amtl/am-string.h>
 
 UserMessages g_UserMsgs;
 
@@ -110,8 +110,6 @@ void UserMessages::OnSourceModAllShutdown()
 
 int UserMessages::GetMessageIndex(const char *msg)
 {
-	SM_PROFILE("UserMessages::GetMessageIndex");
-
 #if SOURCE_ENGINE == SE_DOTA
 	// Can split this per engine and/or game later
 	return g_DotaUsermessageHelpers.GetIndex(msg);
@@ -152,8 +150,6 @@ int UserMessages::GetMessageIndex(const char *msg)
 
 bool UserMessages::GetMessageName(int msgid, char *buffer, size_t maxlength) const
 {
-	SM_PROFILE("UserMessages::GetMessageName");
-
 #ifdef USE_PROTOBUF_USERMESSAGES
 #if SOURCE_ENGINE == SE_DOTA
 	const char *pszName = g_DotaUsermessageHelpers.GetName(msgid);
@@ -163,7 +159,7 @@ bool UserMessages::GetMessageName(int msgid, char *buffer, size_t maxlength) con
 	if (!pszName)
 		return false;
 
-	strncopy(buffer, pszName, maxlength);
+	ke::SafeStrcpy(buffer, maxlength, pszName);
 	return true;
 #else
 	if (m_FallbackSearch)
@@ -176,7 +172,7 @@ bool UserMessages::GetMessageName(int msgid, char *buffer, size_t maxlength) con
 
 	if (msg)
 	{
-		strncopy(buffer, msg, maxlength);
+		ke::SafeStrcpy(buffer, maxlength, msg);
 		return true;
 	}
 
@@ -635,8 +631,6 @@ bf_write *UserMessages::OnStartMessage_Post(IRecipientFilter *filter, int msg_ty
 
 void UserMessages::OnMessageEnd_Post()
 {
-	SM_PROFILE("UserMessages::OnMessageEnd_Post");
-
 	if (!m_InHook)
 	{
 		UM_RETURN_META(MRES_IGNORED);
@@ -705,8 +699,6 @@ void UserMessages::OnMessageEnd_Post()
 
 void UserMessages::OnMessageEnd_Pre()
 {
-	SM_PROFILE("UserMessages::OnMessageEnd_Pre");
-
 	if (!m_InHook)
 	{
 		UM_RETURN_META(MRES_IGNORED);

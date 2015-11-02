@@ -40,10 +40,22 @@
 #include "GameConfigs.h"
 #include "CellArray.h"
 #include "AutoHandleRooter.h"
-#include "ProfileTools.h"
+#include "stringutil.h"
+#include <bridge/include/IPlayerInfoBridge.h>
+#include <bridge/include/ILogger.h>
+#include <bridge/include/CoreProvider.h>
+#include <bridge/include/IVEngineServerBridge.h>
 
 using namespace SourceHook;
 using namespace SourceMod;
+
+#ifndef PRIu64
+#ifdef _WIN32
+#define PRIu64 "I64u"
+#else
+#define PRIu64 "llu"
+#endif
+#endif
 
 static const int kActivityNone = 0;
 static const int kActivityNonAdmins = 1;		// Show admin activity to non-admins anonymously.
@@ -112,8 +124,6 @@ public:
 public: //ICommandTargetProcessor
 	bool ProcessCommandTarget(cmd_target_info_t *info)
 	{
-		SM_PROFILE("PlayerLogicHelpers::ProcessCommandTarget");
-
 		List<SimpleMultiTargetFilter *>::iterator iter;
 
 		for (iter = simpleMultis.begin(); iter != simpleMultis.end(); iter++) {
@@ -158,7 +168,7 @@ public: //ICommandTargetProcessor
 				               ? COMMAND_TARGET_VALID
 				               : COMMAND_TARGET_EMPTY_FILTER;
 				if (info->num_targets) {
-					smcore.strncopy(info->target_name, smtf->phrase.c_str(), info->target_name_maxlength);
+					strncopy(info->target_name, smtf->phrase.c_str(), info->target_name_maxlength);
 					info->target_name_style = smtf->phraseIsML
 					                          ? COMMAND_TARGETNAME_ML
 					                          : COMMAND_TARGETNAME_RAW;
@@ -275,13 +285,13 @@ static cell_t sm_GetClientName(IPluginContext *pCtx, const cell_t *params)
 		static ConVar *hostname = NULL;
 		if (!hostname)
 		{
-			hostname = smcore.FindConVar("hostname");
+			hostname = bridge->FindConVar("hostname");
 			if (!hostname)
 			{
 				return pCtx->ThrowNativeError("Could not find \"hostname\" cvar");
 			}
 		}
-		pCtx->StringToLocalUTF8(params[2], static_cast<size_t>(params[3]), smcore.GetCvarString(hostname), NULL);
+		pCtx->StringToLocalUTF8(params[2], static_cast<size_t>(params[3]), bridge->GetCvarString(hostname), NULL);
 		return 1;
 	}
 
@@ -757,7 +767,7 @@ static cell_t IsClientObserver(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->IsObserver(pInfo) ? 1 : 0;
+	return bridge->playerInfo->IsObserver(pInfo) ? 1 : 0;
 }
 
 static cell_t GetClientTeam(IPluginContext *pContext, const cell_t *params)
@@ -779,7 +789,7 @@ static cell_t GetClientTeam(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->GetTeamIndex(pInfo);
+	return bridge->playerInfo->GetTeamIndex(pInfo);
 }
 
 static cell_t GetFragCount(IPluginContext *pContext, const cell_t *params)
@@ -801,7 +811,7 @@ static cell_t GetFragCount(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->GetFragCount(pInfo);
+	return bridge->playerInfo->GetFragCount(pInfo);
 }
 
 static cell_t GetDeathCount(IPluginContext *pContext, const cell_t *params)
@@ -823,7 +833,7 @@ static cell_t GetDeathCount(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->GetDeathCount(pInfo);
+	return bridge->playerInfo->GetDeathCount(pInfo);
 }
 
 static cell_t GetArmorValue(IPluginContext *pContext, const cell_t *params)
@@ -845,7 +855,7 @@ static cell_t GetArmorValue(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->GetArmorValue(pInfo);
+	return bridge->playerInfo->GetArmorValue(pInfo);
 }
 
 static cell_t GetAbsOrigin(IPluginContext *pContext, const cell_t *params)
@@ -871,7 +881,7 @@ static cell_t GetAbsOrigin(IPluginContext *pContext, const cell_t *params)
 	pContext->LocalToPhysAddr(params[2], &pVec);
 
 	float x, y, z;
-	smcore.playerInfo->GetAbsOrigin(pInfo, &x, &y, &z);
+	bridge->playerInfo->GetAbsOrigin(pInfo, &x, &y, &z);
 	pVec[0] = sp_ftoc(x);
 	pVec[1] = sp_ftoc(y);
 	pVec[2] = sp_ftoc(z);
@@ -902,7 +912,7 @@ static cell_t GetAbsAngles(IPluginContext *pContext, const cell_t *params)
 	pContext->LocalToPhysAddr(params[2], &pAng);
 
 	float x, y, z;
-	smcore.playerInfo->GetAbsAngles(pInfo, &x, &y, &z);
+	bridge->playerInfo->GetAbsAngles(pInfo, &x, &y, &z);
 	pAng[0] = sp_ftoc(x);
 	pAng[1] = sp_ftoc(y);
 	pAng[2] = sp_ftoc(z);
@@ -933,7 +943,7 @@ static cell_t GetPlayerMins(IPluginContext *pContext, const cell_t *params)
 	pContext->LocalToPhysAddr(params[2], &pVec);
 
 	float x, y, z;
-	smcore.playerInfo->GetPlayerMins(pInfo, &x, &y, &z);
+	bridge->playerInfo->GetPlayerMins(pInfo, &x, &y, &z);
 	pVec[0] = sp_ftoc(x);
 	pVec[1] = sp_ftoc(y);
 	pVec[2] = sp_ftoc(z);
@@ -964,7 +974,7 @@ static cell_t GetPlayerMaxs(IPluginContext *pContext, const cell_t *params)
 	pContext->LocalToPhysAddr(params[2], &pVec);
 
 	float x, y, z;
-	smcore.playerInfo->GetPlayerMaxs(pInfo, &x, &y, &z);
+	bridge->playerInfo->GetPlayerMaxs(pInfo, &x, &y, &z);
 	pVec[0] = sp_ftoc(x);
 	pVec[1] = sp_ftoc(y);
 	pVec[2] = sp_ftoc(z);
@@ -991,7 +1001,7 @@ static cell_t GetWeaponName(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	const char *weapon = smcore.playerInfo->GetWeaponName(pInfo);
+	const char *weapon = bridge->playerInfo->GetWeaponName(pInfo);
 	pContext->StringToLocalUTF8(params[2], static_cast<size_t>(params[3]), weapon ? weapon : "", NULL);
 
 	return 1;
@@ -1016,7 +1026,7 @@ static cell_t GetModelName(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	const char *model = smcore.playerInfo->GetModelName(pInfo);
+	const char *model = bridge->playerInfo->GetModelName(pInfo);
 	pContext->StringToLocalUTF8(params[2], static_cast<size_t>(params[3]), model ? model : "", NULL);
 
 	return 1;
@@ -1041,7 +1051,7 @@ static cell_t GetHealth(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	return smcore.playerInfo->GetHealth(pInfo);
+	return bridge->playerInfo->GetHealth(pInfo);
 }
 
 static cell_t GetClientOfUserId(IPluginContext *pContext, const cell_t *params)
@@ -1056,7 +1066,7 @@ static cell_t _ShowActivity(IPluginContext *pContext,
 {
 	char message[255];
 	char buffer[255];
-	int value = smcore.GetActivityFlags();
+	int value = bridge->GetActivityFlags();
 	unsigned int replyto = playerhelpers->GetReplyTo();
 	int client = params[1];
 
@@ -1107,7 +1117,7 @@ static cell_t _ShowActivity(IPluginContext *pContext,
 		}
 
 		g_pSM->Format(message, sizeof(message), "%s%s\n", tag, buffer);
-		smcore.ConPrint(message);
+		bridge->ConPrint(message);
 	}
 
 	if (value == kActivityNone)
@@ -1187,7 +1197,7 @@ static cell_t _ShowActivity2(IPluginContext *pContext,
 {
 	char message[255];
 	char buffer[255];
-	int value = smcore.GetActivityFlags();
+	int value = bridge->GetActivityFlags();
 	unsigned int replyto = playerhelpers->GetReplyTo();
 	int client = params[1];
 
@@ -1234,7 +1244,7 @@ static cell_t _ShowActivity2(IPluginContext *pContext,
 		}
 
 		g_pSM->Format(message, sizeof(message), "%s%s\n", tag, buffer);
-		smcore.ConPrint(message);
+		bridge->ConPrint(message);
 	}
 
 	if (value == kActivityNone)
@@ -1420,7 +1430,7 @@ static cell_t ChangeClientTeam(IPluginContext *pContext, const cell_t *params)
 		return pContext->ThrowNativeError("IPlayerInfo not supported by game");
 	}
 
-	smcore.playerInfo->ChangeTeam(pInfo, params[2]);
+	bridge->playerInfo->ChangeTeam(pInfo, params[2]);
 
 	return 1;
 }
@@ -1467,8 +1477,6 @@ static cell_t IsClientInKickQueue(IPluginContext *pContext, const cell_t *params
 
 static cell_t ProcessTargetString(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("ProcessTargetString");
-
 	cmd_target_info_t info;
 
 	pContext->LocalToString(params[1], (char **) &info.pattern);
@@ -1524,7 +1532,7 @@ static cell_t FormatActivitySource(IPluginContext *pContext, const cell_t *param
 		return pContext->ThrowNativeError("Client %d not connected", target);
 	}
 
-	value = smcore.GetActivityFlags();
+	value = bridge->GetActivityFlags();
 
 	if (client != 0)
 	{
