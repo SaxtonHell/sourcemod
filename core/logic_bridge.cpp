@@ -601,7 +601,7 @@ bool CoreProviderImpl::DescribePlayer(int index, const char **namep, const char 
 	if (namep)
 		*namep = player->GetName();
 	if (authp) {
-		const char *auth = player->GetAuthString();
+		const char *auth = player->GetSteam2Id(false);
 		*authp = (auth && *auth) ? auth : "STEAM_ID_PENDING";
 	}
 	if (useridp)
