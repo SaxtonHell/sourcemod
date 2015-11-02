@@ -74,8 +74,6 @@ enum
 
 static cell_t smn_TRTraceRay(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceRay");
-
 	cell_t *startaddr, *endaddr;
 	pContext->LocalToPhysAddr(params[1], &startaddr);
 	pContext->LocalToPhysAddr(params[2], &endaddr);
@@ -109,8 +107,6 @@ static cell_t smn_TRTraceRay(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_TRTraceHull(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceHull");
-
 	cell_t *startaddr, *endaddr, *mins, *maxs;
 	pContext->LocalToPhysAddr(params[1], &startaddr);
 	pContext->LocalToPhysAddr(params[2], &endaddr);
@@ -130,8 +126,6 @@ static cell_t smn_TRTraceHull(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_TRTraceRayFilter(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceRayFilter");
-
 	cell_t *startaddr, *endaddr;
 	IPluginFunction *pFunc;
 	cell_t data;
@@ -184,8 +178,6 @@ static cell_t smn_TRTraceRayFilter(IPluginContext *pContext, const cell_t *param
 
 static cell_t smn_TRTraceHullFilter(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceHullFilter");
-
 	cell_t data;
 	IPluginFunction *pFunc;
 	cell_t *startaddr, *endaddr, *mins, *maxs;
@@ -218,8 +210,6 @@ static cell_t smn_TRTraceHullFilter(IPluginContext *pContext, const cell_t *para
 
 static cell_t smn_TRTraceRayEx(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceRayEx");
-
 	cell_t *startaddr, *endaddr;
 	pContext->LocalToPhysAddr(params[1], &startaddr);
 	pContext->LocalToPhysAddr(params[2], &endaddr);
@@ -266,8 +256,6 @@ static cell_t smn_TRTraceRayEx(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_TRTraceHullEx(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceHullEx");
-
 	cell_t *startaddr, *endaddr, *mins, *maxs;
 	pContext->LocalToPhysAddr(params[1], &startaddr);
 	pContext->LocalToPhysAddr(params[2], &endaddr);
@@ -300,8 +288,6 @@ static cell_t smn_TRTraceHullEx(IPluginContext *pContext, const cell_t *params)
 
 static cell_t smn_TRTraceRayFilterEx(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceRayFilterEx");
-
 	IPluginFunction *pFunc;
 	cell_t *startaddr, *endaddr;
 	cell_t data;
@@ -367,8 +353,6 @@ static cell_t smn_TRTraceRayFilterEx(IPluginContext *pContext, const cell_t *par
 
 static cell_t smn_TRTraceHullFilterEx(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRTraceHullFilterEx");
-
 	IPluginFunction *pFunc;
 	cell_t *startaddr, *endaddr, *mins, *maxs;
 	cell_t data;
@@ -559,8 +543,6 @@ static cell_t smn_TRGetPointContents(IPluginContext *pContext, const cell_t *par
 
 static cell_t smn_TRGetPointContentsEnt(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRGetPointContentsEnt");
-
 	/* TODO: See if we can get the collidable with a prop and remove the reliance on edicts */
 	edict_t *pEdict = PEntityOfEntIndex(gamehelpers->ReferenceToIndex(params[1]));
 	if (!pEdict || pEdict->IsFree())
@@ -582,8 +564,6 @@ static cell_t smn_TRGetPointContentsEnt(IPluginContext *pContext, const cell_t *
 
 static cell_t smn_TRPointOutsideWorld(IPluginContext *pContext, const cell_t *params)
 {
-	SM_PROFILE("smn_TRPointOutsideWorld");
-
 	cell_t *vec;
 	Vector pos;
 	

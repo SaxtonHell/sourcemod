@@ -36,7 +36,6 @@
 #include <stdint.h>
 #include <sys/time.h>
 #endif
-#include "ProfileTools.h"
 #include <string.h>
 
 struct Profiler
@@ -189,29 +188,17 @@ static cell_t GetProfilerTime(IPluginContext *pContext, const cell_t *params)
 
 static cell_t EnterProfilingEvent(IPluginContext *pContext, const cell_t *params)
 {
-	char *group;
-	pContext->LocalToString(params[1], &group);
-
-	char *name;
-	pContext->LocalToString(params[2], &name);
-
-	const char *groupname = NULL;
-	if (strcmp(group, "all") != 0)
-		groupname = group;
-
-	g_ProfileToolManager.EnterScope(groupname, name);
-	return 1;
+	return 0;
 }
 
 static cell_t LeaveProfilingEvent(IPluginContext *pContext, const cell_t *params)
 {
-	g_ProfileToolManager.LeaveScope();
-	return 1;
+	return 0;
 }
 
 static cell_t IsProfilingActive(IPluginContext *pContext, const cell_t *params)
 {
-	return g_ProfileToolManager.IsActive() ? 1 : 0;
+	return 0;
 }
 
 REGISTER_NATIVES(profilerNatives)

@@ -383,8 +383,6 @@ void TempEntityManager::Shutdown()
 
 TempEntityInfo *TempEntityManager::GetTempEntityInfo(const char *name)
 {
-	SM_PROFILE("TempEntityManager::GetTempEntityInfo");
-
 	/* If the system is unloaded skip the search */
 	if (!IsAvailable())
 	{

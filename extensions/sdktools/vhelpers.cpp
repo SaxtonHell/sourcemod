@@ -206,8 +206,6 @@ bool GetEyeAngles(CBaseEntity *pEntity, QAngle *pAngles)
 
 int GetClientAimTarget(edict_t *pEdict, bool only_players)
 {
-	SM_PROFILE("GetClientAimTarget");
-
 	CBaseEntity *pEntity = pEdict->GetUnknown() ? pEdict->GetUnknown()->GetBaseEntity() : NULL;
 
 	if (pEntity == NULL)

@@ -237,8 +237,6 @@ void SoundHooks::OnEmitAmbientSound(int entindex, const Vector &pos, const char 
 									soundlevel_t soundlevel, int fFlags, int pitch, float delay)
 {
 #endif
-	SM_PROFILE("SoundHooks::OnEmitAmbientSound");
-
 	SoundHookIter iter;
 	IPluginFunction *pFunc;
 	cell_t vec[3] = {sp_ftoc(pos.x), sp_ftoc(pos.y), sp_ftoc(pos.z)};
@@ -355,8 +353,6 @@ void SoundHooks::OnEmitSound(IRecipientFilter &filter, int iEntIndex, int iChann
 							 float soundtime, int speakerentity)
 #endif
 {
-	SM_PROFILE("SoundHooks::OnEmitSound");
-
 	SoundHookIter iter;
 	IPluginFunction *pFunc;
 	cell_t res = static_cast<ResultType>(Pl_Continue);
@@ -494,8 +490,6 @@ void SoundHooks::OnEmitSound2(IRecipientFilter &filter, int iEntIndex, int iChan
 							 float soundtime, int speakerentity)
 #endif
 {
-	SM_PROFILE("SoundHooks::OnEmitSound2");
-
 	SoundHookIter iter;
 	IPluginFunction *pFunc;
 	cell_t res = static_cast<ResultType>(Pl_Continue);

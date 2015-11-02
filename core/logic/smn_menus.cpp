@@ -34,7 +34,6 @@
 #include <IMenuManager.h>
 #include <IPlayerHelpers.h>
 #include "DebugReporter.h"
-#include "ProfileTools.h"
 #if defined MENU_DEBUG
 #include "Logger.h"
 #endif
@@ -468,8 +467,6 @@ cell_t CMenuHandler::DoAction(IBaseMenu *menu, MenuAction action, cell_t param1,
 
 void CMenuHandler::OnMenuVoteResults(IBaseMenu *menu, const menu_vote_result_t *results)
 {
-	SM_PROFILE("CMenuHandler::OnMenuVoteResults");
-
 	if (!m_pVoteResults)
 	{
 		/* Call MenuAction_VoteEnd instead.  See if there are any extra winners. */
