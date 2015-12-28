@@ -199,12 +199,43 @@ public Action Command_Nominate(int client, int args)
 	
 	char mapname[PLATFORM_MAX_PATH];
 	GetCmdArg(1, mapname, sizeof(mapname));
-	
+
+	TryNominate(client, mapname);
+
+	return Plugin_Handled;
+}
+
+void TryNominate(int client, const char[] input)
+{
+	// copy our input so we can modify it later
+	char mapname[PLATFORM_MAX_PATH];
+	strcopy(mapname, sizeof(mapname), input);
+
+	ArrayList potentialMapList = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+
+	FindMapMatches(mapname, potentialMapList);
+
+	if (potentialMapList.Length == 1)
+	{
+		// we fuzzy matched a single map, update our copied input
+		potentialMapList.GetString(0, mapname, sizeof(mapname));
+	}
+	else if (potentialMapList.Length > 1)
+	{
+		// we fuzzy matched many maps, display a nomination menu with the ones we matched
+		ShowNominationList(client, potentialMapList);
+
+		delete potentialMapList;
+		return;
+	}
+
+	delete potentialMapList;
+
 	if (FindMap(mapname, mapname, sizeof(mapname)) == FindMap_NotFound)
 	{
 		// We couldn't resolve the map entry to a filename, so...
 		ReplyToCommand(client, "%t", "Map was not found", mapname);
-		return Plugin_Handled;		
+		return;		
 	}
 	
 	char displayName[PLATFORM_MAX_PATH];
@@ -214,7 +245,7 @@ public Action Command_Nominate(int client, int args)
 	if (!g_mapTrie.GetValue(mapname, status))
 	{
 		ReplyToCommand(client, "%t", "Map was not found", displayName);
-		return Plugin_Handled;		
+		return;		
 	}
 	
 	if ((status & MAPSTATUS_DISABLED) == MAPSTATUS_DISABLED)
@@ -234,7 +265,7 @@ public Action Command_Nominate(int client, int args)
 			ReplyToCommand(client, "[SM] %t", "Map Already Nominated");
 		}
 		
-		return Plugin_Handled;
+		return;
 	}
 	
 	NominateResult result = NominateMap(mapname, false, client);
@@ -250,7 +281,7 @@ public Action Command_Nominate(int client, int args)
 			ReplyToCommand(client, "[SM] %t", "Map Already Nominated");
 		}
 		
-		return Plugin_Handled;	
+		return;	
 	}
 	
 	/* Map was nominated! - Disable the menu item and update the trie */
@@ -262,8 +293,6 @@ public Action Command_Nominate(int client, int args)
 	PrintToChatAll("[SM] %t", "Map Nominated", name, displayName);
 
 	LogAction(client, -1, "\"%L\" nominated map \"%s\"", client, mapname);
-	
-	return Plugin_Continue;
 }
 
 void AttemptNominate(int client)
@@ -333,6 +362,43 @@ void BuildMapMenu()
 	g_MapMenu.ExitButton = true;
 
 	delete excludeMaps;
+}
+
+void ShowNominationList(int client, ArrayList mapList)
+{
+	Menu nominationMenu = new Menu(Handler_MapListSelectMenu, MENU_ACTIONS_DEFAULT|MenuAction_DrawItem|MenuAction_DisplayItem);
+
+	char map[PLATFORM_MAX_PATH];
+	
+	for (int i = 0; i < mapList.Length; i++)
+	{
+		mapList.GetString(i, map, sizeof(map));
+		
+		FindMap(map, map, sizeof(map));
+		
+		char displayName[PLATFORM_MAX_PATH];
+		GetMapDisplayName(map, displayName, sizeof(displayName));
+		
+		nominationMenu.AddItem(map, displayName);
+	}
+
+	nominationMenu.ExitButton = true;
+
+	nominationMenu.SetTitle("%T", "Nominate Title", client);
+	nominationMenu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int Handler_MapListSelectMenu(Menu menu, MenuAction action, int param1, int param2)
+{
+	// this handler piggybacks off the existing menu handler, but also handles cleanup
+	// because the nominate-by-maplist menu is temporary rather than long-lived
+	if (action == MenuAction_End)
+	{
+		delete menu;
+		return 0;
+	}
+
+	return Handler_MapSelectMenu(menu, action, param1, param2);
 }
 
 public int Handler_MapSelectMenu(Menu menu, MenuAction action, int param1, int param2)
@@ -438,4 +504,23 @@ public int Handler_MapSelectMenu(Menu menu, MenuAction action, int param1, int p
 	}
 	
 	return 0;
+}
+
+void FindMapMatches(const char[] search, ArrayList &outList)
+{
+	int numMaps = GetArraySize(g_MapList);
+
+	for (int x = 0; x < numMaps; ++x)
+	{
+		char mapName[PLATFORM_MAX_PATH];
+		g_MapList.GetString(x, mapName, sizeof(mapName));
+
+		if (StrContains(mapName, search, false) == -1)
+		{
+			// no match here
+			continue;
+		}
+
+		outList.PushString(mapName);
+	}
 }
