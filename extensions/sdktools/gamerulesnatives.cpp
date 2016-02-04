@@ -176,7 +176,8 @@ static cell_t GameRules_GetProp(IPluginContext *pContext, const cell_t *params)
 	is_unsigned = ((pProp->GetFlags() & SPROP_UNSIGNED) == SPROP_UNSIGNED);
 
 	// This isn't in CS:S yet, but will be, doesn't hurt to add now, and will save us a build later
-#if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2
+#if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2 \
+	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS
 	if (pProp->GetFlags() & SPROP_VARINT)
 	{
 		bit_count = sizeof(int) * 8;
@@ -245,7 +246,8 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 
 	FIND_PROP_SEND(DPT_Int, "integer");
 
-#if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2
+#if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2 \
+	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS
 	if (pProp->GetFlags() & SPROP_VARINT)
 	{
 		bit_count = sizeof(int) * 8;
@@ -262,7 +264,6 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 		*(int32_t *)((intptr_t)pGameRules + offset) = params[2];
 		if (sendChange)
 		{
-			*(int32_t *)((intptr_t)pProxy + offset) = params[2];
 			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 		}
 	}
@@ -271,7 +272,6 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 		*(int16_t *)((intptr_t)pGameRules + offset) = (int16_t)params[2];
 		if (sendChange)
 		{
-			*(int16_t *)((intptr_t)pProxy + offset) = (int16_t)params[2];
 			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 		}
 	}
@@ -280,7 +280,6 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 		*(int8_t *)((intptr_t)pGameRules + offset) = (int8_t)params[2];
 		if (sendChange)
 		{
-			*(int8_t *)((intptr_t)pProxy + offset) = (int8_t)params[2];
 			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 		}
 	}
@@ -289,7 +288,6 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 		*(bool *)((intptr_t)pGameRules + offset) = (params[2] == 0) ? false : true;
 		if (sendChange)
 		{
-			*(bool *)((intptr_t)pProxy + offset) = (params[2] == 0) ? false : true;
 			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 		}
 	}
@@ -348,7 +346,6 @@ static cell_t GameRules_SetPropFloat(IPluginContext *pContext, const cell_t *par
 
 	if (sendChange)
 	{
-		*(float *)((intptr_t)pProxy + offset) = newVal;
 		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 	}
 
@@ -428,17 +425,6 @@ static cell_t GameRules_SetPropEnt(IPluginContext *pContext, const cell_t *param
 
 	if (sendChange)
 	{
-		CBaseHandle &hndl = *(CBaseHandle *)((intptr_t)pProxy + offset);
-		if (params[2] == -1)
-		{
-			hndl.Set(NULL);
-		}
-		else
-		{
-			IHandleEntity *pHandleEnt = (IHandleEntity *)pOther;
-			hndl.Set(pHandleEnt);
-		}
-
 		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 	}
 
@@ -508,11 +494,6 @@ static cell_t GameRules_SetPropVector(IPluginContext *pContext, const cell_t *pa
 
 	if (sendChange)
 	{
-		v = (Vector *)((intptr_t)pProxy + offset);
-		v->x = sp_ctof(vec[0]);
-		v->y = sp_ctof(vec[1]);
-		v->z = sp_ctof(vec[2]);
-
 		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 	}
 
@@ -623,8 +604,6 @@ static cell_t GameRules_SetPropString(IPluginContext *pContext, const cell_t *pa
 
 	if (sendChange)
 	{
-		dest = (char *)((intptr_t)pProxy + offset);
-		strncopy(dest, src, maxlen);
 		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
 	}
 
