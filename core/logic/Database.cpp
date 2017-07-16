@@ -522,7 +522,7 @@ void DBManager::KillWorkerThread()
 			m_QueueEvent.Notify();
 		}
 		m_Worker->Join();
-		m_Worker = NULL;
+		m_Worker = nullptr;
 		s_OneTimeThreaderErrorMsg = false;
 		m_Terminate = false;
 	}
@@ -539,7 +539,9 @@ bool DBManager::AddToThreadQueue(IDBThreadOperation *op, PrioQueueLevel prio)
 
 	if (!m_Worker)
 	{
-		m_Worker = new ke::Thread(this, "SM SQL Worker");
+		m_Worker = new ke::Thread([this]() -> void {
+			Run();
+		}, "SM SQL Worker");
 		if (!m_Worker->Succeeded())
 		{
 			if (!s_OneTimeThreaderErrorMsg)
@@ -547,7 +549,7 @@ bool DBManager::AddToThreadQueue(IDBThreadOperation *op, PrioQueueLevel prio)
 				logger->LogError("[SM] Unable to create db threader (error unknown)");
 				s_OneTimeThreaderErrorMsg = true;
 			}
-			m_Worker = NULL;
+			m_Worker = nullptr;
 			return false;
 		}
 	}

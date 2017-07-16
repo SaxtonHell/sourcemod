@@ -18,7 +18,7 @@
 			"Burn"
 			{
 				"library"	"server"
-				"windows"	"\x55\x8B\xEC\x51\x56\x8B\xF1\x8B\x8E\x2A\x2A\x2A\x2A\x8B\x01\x8B\x80\x2A\x2A\x2A\x2A\xFF\xD0\x84\xC0\x0F\x84"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x08\x56\x8B\xF1\x8B\x8E\x8C\x01\x00\x00\x8B\x01"
 				"linux"		"@_ZN15CTFPlayerShared4BurnEP9CTFPlayerP13CTFWeaponBasef"
 				"mac"		"@_ZN15CTFPlayerShared4BurnEP9CTFPlayerP13CTFWeaponBasef"
 			}
@@ -60,7 +60,7 @@
 			"SetPowerplayEnabled"
 			{
 				"library"	"server"
-				"windows"	"\x55\x8B\xEC\x80\x7D\x08\x00\x56\x57"
+				"windows"	"\x55\x8B\xEC\x80\x7D\x08\x00\x56\x57\x8B\xF9"
 				"linux"		"@_ZN9CTFPlayer19SetPowerplayEnabledEb"
 				"mac"		"@_ZN9CTFPlayer19SetPowerplayEnabledEb"
 			}
@@ -74,14 +74,14 @@
 			"StunPlayer"
 			{
 				"library"	"server"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x57\x8B\xF9\x8B\x87\xFC\x03\x00\x00"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x57\x8B\xF9\x8B\x87\xF8\x03\x00\x00"
 				"linux"		"@_ZN15CTFPlayerShared10StunPlayerEffiP9CTFPlayer"
 				"mac"		"@_ZN15CTFPlayerShared10StunPlayerEffiP9CTFPlayer"
 			}
 			"MakeBleed"
 			{
 				"library" 	"server"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x56\x8B\xF1\x89\x75\xF8\x8B\x8E\x2A\x2A\x2A\x2A\x8B\x01"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x2C\x53\x8B\xD9\x89\x5D\xEC"
 				"linux"		"@_ZN15CTFPlayerShared9MakeBleedEP9CTFPlayerP13CTFWeaponBasefib"
 				"mac"		"@_ZN15CTFPlayerShared9MakeBleedEP9CTFPlayerP13CTFWeaponBasefib"
 			}
@@ -113,21 +113,21 @@
 		{
 			"ForceRespawn"
 			{
-				"windows"	"326"
-				"linux"		"327"
-				"mac"		"327"
+				"windows"	"328"
+				"linux"		"329"
+				"mac"		"329"
 			}
 			"CalcIsAttackCriticalHelper"
-			{
-				"windows"	"386"
-				"linux"		"393"
-				"mac"		"393"
-			}
-			"CalcIsAttackCriticalHelperNoCrits"
 			{
 				"windows"	"387"
 				"linux"		"394"
 				"mac"		"394"
+			}
+			"CalcIsAttackCriticalHelperNoCrits"
+			{
+				"windows"	"388"
+				"linux"		"395"
+				"mac"		"395"
 			}
 			
 			// CTFGameRules::IsHolidayActive
@@ -140,9 +140,9 @@
 
 			"RemoveWearable"
 			{
-				"windows"	"428"
-				"linux"		"429"
-				"mac"		"429"
+				"windows"	"430"
+				"linux"		"431"
+				"mac"		"431"
 			}
 		}
 	}
@@ -161,11 +161,10 @@
 			"TFHoliday_EndOfTheLine"	"5"
 			"TFHoliday_ValentinesDay"	"6"
 			"TFHoliday_MeetThePyro"		"7"
-			"TFHoliday_SpyVsEngyWar"	"8"
-			"TFHoliday_FullMoon"		"9"
-			"TFHoliday_HalloweenOrFullMoon"				"10"
-			"TFHoliday_HalloweenOrFullMoonOrValentines"	"11"
-			"TFHoliday_AprilFools"		"12"
+			"TFHoliday_FullMoon"		"8"
+			"TFHoliday_HalloweenOrFullMoon"				"9"
+			"TFHoliday_HalloweenOrFullMoonOrValentines"	"10"
+			"TFHoliday_AprilFools"		"11"
 		}
 	}
 }

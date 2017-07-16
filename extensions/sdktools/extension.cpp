@@ -2,7 +2,7 @@
  * vim: set ts=4 :
  * =============================================================================
  * SourceMod SDKTools Extension
- * Copyright (C) 2004-2010 AlliedModders LLC.  All rights reserved.
+ * Copyright (C) 2004-2017 AlliedModders LLC.  All rights reserved.
  * =============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -38,6 +38,7 @@
 #include "vglobals.h"
 #include "tempents.h"
 #include "vsound.h"
+#include "variant-t.h"
 #include "output.h"
 #include "hooks.h"
 #include "gamerulesnatives.h"
@@ -114,6 +115,7 @@ bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	sharesys->AddNatives(myself, g_TRNatives);
 	sharesys->AddNatives(myself, g_StringTableNatives);
 	sharesys->AddNatives(myself, g_VoiceNatives);
+	sharesys->AddNatives(myself, g_VariantTNatives);
 	sharesys->AddNatives(myself, g_EntInputNatives);
 	sharesys->AddNatives(myself, g_TeamNatives);
 	sharesys->AddNatives(myself, g_EntOutputNatives);
@@ -169,6 +171,19 @@ bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	GameRulesNativesInit();
 
 	InitSDKToolsAPI();
+
+#if SOURCE_ENGINE == SE_CSGO
+	m_bFollowCSGOServerGuidelines = true;
+	const char *pszValue = g_pSM->GetCoreConfigValue("FollowCSGOServerGuidelines");
+	if (pszValue && strcasecmp(pszValue, "no") == 0)
+	{
+		m_bFollowCSGOServerGuidelines = false;
+	}
+
+	m_CSGOBadList.init();
+	m_CSGOBadList.add("m_bIsValveDS");
+	m_CSGOBadList.add("m_bIsQuestEligible");
+#endif
 
 	return true;
 }
@@ -253,9 +268,7 @@ bool SDKTools::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool
 	GET_V_IFACE_ANY(GetEngineFactory, engsound, IEngineSound, IENGINESOUND_SERVER_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, enginetrace, IEngineTrace, INTERFACEVERSION_ENGINETRACE_SERVER);
 	GET_V_IFACE_ANY(GetEngineFactory, netstringtables, INetworkStringTableContainer, INTERFACENAME_NETWORKSTRINGTABLESERVER);
-#if SOURCE_ENGINE != SE_DOTA
 	GET_V_IFACE_ANY(GetEngineFactory, pluginhelpers, IServerPluginHelpers, INTERFACEVERSION_ISERVERPLUGINHELPERS);
-#endif
 	GET_V_IFACE_ANY(GetServerFactory, serverClients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
 	GET_V_IFACE_ANY(GetEngineFactory, voiceserver, IVoiceServer, INTERFACEVERSION_VOICESERVER);
 	GET_V_IFACE_ANY(GetServerFactory, playerinfomngr, IPlayerInfoManager, INTERFACEVERSION_PLAYERINFOMANAGER);
@@ -306,6 +319,7 @@ void SDKTools::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax
 {
 	InitTeamNatives();
 	GetResourceEntity();
+	g_Hooks.OnMapStart();
 }
 
 bool SDKTools::QueryRunning(char *error, size_t maxlength)
@@ -349,11 +363,7 @@ void SDKTools::NotifyInterfaceDrop(SMInterface *pInterface)
 
 bool SDKTools::RegisterConCommandBase(ConCommandBase *pVar)
 {
-#if defined METAMOD_PLAPI_VERSION
 	return g_SMAPI->RegisterConCommandBase(g_PLAPI, pVar);
-#else
-	return g_SMAPI->RegisterConCmdBase(g_PLAPI, pVar);
-#endif
 }
 
 bool SDKTools::LevelInit(char const *pMapName, char const *pMapEntities, char const *pOldLevel, char const *pLandmarkName, bool loadGame, bool background)
@@ -438,7 +448,7 @@ bool SDKTools::ProcessCommandTarget(cmd_target_info_t *info)
 		for (int i = 1; i <= playerhelpers->GetMaxClients(); i++)
 		{
 			IGamePlayer *player = playerhelpers->GetGamePlayer(i);
-			if (player == NULL || !player->IsInGame())
+			if (player == NULL || !player->IsInGame() || player->IsSourceTV() || player->IsReplay())
 				continue;
 			IPlayerInfo *plinfo = player->GetPlayerInfo();
 			if (plinfo == NULL)

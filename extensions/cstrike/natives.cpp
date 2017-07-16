@@ -226,21 +226,7 @@ static cell_t CS_DropWeapon(IPluginContext *pContext, const cell_t *params)
 	static ICallWrapper *pWrapper = NULL;
 	if (!pWrapper)
 	{
-#if SOURCE_ENGINE == SE_CSGO
-		REGISTER_NATIVE_ADDR("CSWeaponDrop",
-			PassInfo pass[3]; \
-			pass[0].flags = PASSFLAG_BYVAL; \
-			pass[0].type = PassType_Basic; \
-			pass[0].size = sizeof(CBaseEntity *); \
-			pass[1].flags = PASSFLAG_BYVAL; \
-			pass[1].type = PassType_Basic; \
-			pass[1].size = sizeof(Vector); \
-			pass[2].flags = PASSFLAG_BYVAL; \
-			pass[2].type = PassType_Basic; \
-			pass[2].size = sizeof(bool); \
-			pWrapper = g_pBinTools->CreateCall(addr, CallConv_ThisCall, NULL, pass, 3))
-#else
-		REGISTER_NATIVE_ADDR("CSWeaponDrop",
+		REGISTER_NATIVE_ADDR(WEAPONDROP_GAMEDATA_NAME,
 			PassInfo pass[3]; \
 			pass[0].flags = PASSFLAG_BYVAL; \
 			pass[0].type  = PassType_Basic; \
@@ -252,7 +238,6 @@ static cell_t CS_DropWeapon(IPluginContext *pContext, const cell_t *params)
 			pass[2].type  = PassType_Basic; \
 			pass[2].size  = sizeof(bool); \
 			pWrapper = g_pBinTools->CreateCall(addr, CallConv_ThisCall, NULL, pass, 3))
-#endif
 	}
 
 	CBaseEntity *pEntity;
@@ -285,11 +270,7 @@ static cell_t CS_DropWeapon(IPluginContext *pContext, const cell_t *params)
 	if (params[4] == 1 && g_pCSWeaponDropDetoured)
 		g_pIgnoreCSWeaponDropDetour = true;
 
-#if SOURCE_ENGINE == SE_CSGO
-	unsigned char vstk[sizeof(CBaseEntity *) * 2 + sizeof(bool) + sizeof(Vector)];
-#else
 	unsigned char vstk[sizeof(CBaseEntity *) * 2 + sizeof(bool) * 2];
-#endif
 	unsigned char *vptr = vstk;
 
 	// <psychonic> first one is always false. second is true to toss, false to just drop
@@ -297,15 +278,9 @@ static cell_t CS_DropWeapon(IPluginContext *pContext, const cell_t *params)
 	vptr += sizeof(CBaseEntity *);
 	*(CBaseEntity **)vptr = pWeapon;
 	vptr += sizeof(CBaseEntity *);
-#if SOURCE_ENGINE == SE_CSGO
-	*(Vector *)vptr = vec3_origin;
-	vptr += sizeof(Vector);
-	*(bool *)vptr = false;
-#else
 	*(bool *)vptr = false;
 	vptr += sizeof(bool);
 	*(bool *)vptr = (params[3]) ? true : false;
-#endif
 
  	pWrapper->Execute(vstk, NULL);
 
@@ -466,7 +441,6 @@ static cell_t CS_GetWeaponPrice(IPluginContext *pContext, const cell_t *params)
 #if SOURCE_ENGINE == SE_CSGO
 	static ICallWrapper *pWrapper = NULL;
 
-#if defined(WIN32)
 	if(!pWrapper)
 	{
 		void *pGetWeaponPrice = GetWeaponPriceFunction();
@@ -475,7 +449,13 @@ static cell_t CS_GetWeaponPrice(IPluginContext *pContext, const cell_t *params)
 			return pContext->ThrowNativeError("Failed to locate function");
 		}
 
-		PassInfo pass[2];
+		
+#ifdef _WIN32 
+		const size_t GWP_ARGC = 2;
+#else
+		const size_t GWP_ARGC = 3;
+#endif
+		PassInfo pass[GWP_ARGC];
 		PassInfo ret;
 		pass[0].flags = PASSFLAG_BYVAL;
 		pass[0].type = PassType_Basic;
@@ -483,32 +463,17 @@ static cell_t CS_GetWeaponPrice(IPluginContext *pContext, const cell_t *params)
 		pass[1].flags = PASSFLAG_BYVAL;
 		pass[1].type = PassType_Basic;
 		pass[1].size = sizeof(int);
+#ifndef _WIN32
+		pass[2].flags = PASSFLAG_BYVAL;
+		pass[2].type = PassType_Float;
+		pass[2].size = sizeof(float);
+#endif
 		ret.flags = PASSFLAG_BYVAL;
 		ret.type = PassType_Basic;
 		ret.size = sizeof(int);
-		pWrapper = g_pBinTools->CreateCall(pGetWeaponPrice, CallConv_ThisCall, &ret, pass, 2);
+		pWrapper = g_pBinTools->CreateCall(pGetWeaponPrice, CallConv_ThisCall, &ret, pass, GWP_ARGC);
 	}
-#else
-	if (!pWrapper)
-	{
-		REGISTER_NATIVE_ADDR("GetWeaponPrice",
-		PassInfo pass[3]; \
-		PassInfo ret; \
-		pass[0].flags = PASSFLAG_BYVAL; \
-		pass[0].type = PassType_Basic; \
-		pass[0].size = sizeof(CEconItemView *); \
-		pass[1].flags = PASSFLAG_BYVAL; \
-		pass[1].type = PassType_Basic; \
-		pass[1].size = sizeof(int); \
-		pass[2].flags = PASSFLAG_BYVAL; \
-		pass[2].type = PassType_Float; \
-		pass[2].size = sizeof(float); \
-		ret.flags = PASSFLAG_BYVAL; \
-		ret.type = PassType_Basic; \
-		ret.size = sizeof(int); \
-		pWrapper = g_pBinTools->CreateCall(addr, CallConv_ThisCall, &ret, pass, 3))
-	}
-#endif
+
 	// Get a CEconItemView for the m4
 	// Found in CCSPlayer::HandleCommand_Buy_Internal
 	// Linux a1 - CCSPlayer *pEntity, v5 - Player Team, a3 - ItemLoadoutSlot -1 use default loadoutslot:

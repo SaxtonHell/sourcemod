@@ -95,7 +95,6 @@ native bool RemoveNominationByOwner(int owner);
  * Gets the current list of excluded maps.
  *
  * @param array		An ADT array handle to add the map strings to.
- * @noreturn
  */
 native void GetExcludeMapList(ArrayList array);
 
@@ -104,7 +103,6 @@ native void GetExcludeMapList(ArrayList array);
  *
  * @param maparray		An ADT array handle to add the map strings to.
  * @param ownerarray	An optional ADT array handle to add the nominator client indexes to.
- * @noreturn
  */
 native void GetNominatedMapList(ArrayList maparray, ArrayList ownerarray = null);
 
@@ -211,4 +209,3 @@ public void __pl_mapchooser_SetNTVOptional()
 	MarkNativeAsOptional("HasEndOfMapVoteFinished");
 	MarkNativeAsOptional("EndOfMapVoteEnabled");
 }
-

@@ -103,8 +103,6 @@ SMEXT_LINK(&g_Interface);
 CGlobalVars *gpGlobals;
 ke::Vector<CVTableList *> g_HookList[SDKHook_MAXHOOKS];
 
-CBitVec<NUM_ENT_ENTRIES> m_EntityExists;
-
 IBinTools *g_pBinTools = NULL;
 ICvar *icvar = NULL;
 
@@ -179,11 +177,7 @@ SH_DECL_MANUALHOOK0_void(PostThink, 0, 0, 0);
 SH_DECL_MANUALHOOK0(Reload, 0, 0, 0, bool);
 SH_DECL_MANUALHOOK2_void(SetTransmit, 0, 0, 0, CCheckTransmitInfo *, bool);
 SH_DECL_MANUALHOOK2(ShouldCollide, 0, 0, 0, bool, int, int);
-#if SOURCE_ENGINE == SE_DOTA
-SH_DECL_MANUALHOOK1_void(Spawn, 0, 0, 0, CEntityKeyValues *);
-#else
 SH_DECL_MANUALHOOK0_void(Spawn, 0, 0, 0);
-#endif
 SH_DECL_MANUALHOOK1_void(StartTouch, 0, 0, 0, CBaseEntity *);
 SH_DECL_MANUALHOOK0_void(Think, 0, 0, 0);
 SH_DECL_MANUALHOOK1_void(Touch, 0, 0, 0, CBaseEntity *);
@@ -235,6 +229,8 @@ bool SDKHooks::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		return false;
 	}
 
+	memset(m_EntityCache, INVALID_EHANDLE_INDEX, sizeof(m_EntityCache));
+
 	CUtlVector<IEntityListener *> *entListeners = EntListeners();
 	if (!entListeners)
 	{
@@ -274,13 +270,20 @@ bool SDKHooks::SDK_OnLoad(char *error, size_t maxlength, bool late)
 			continue;
 		
 		index = hndl.GetEntryIndex();
-		m_EntityExists.Set(index);
+		if (IsEntityIndexInRange(index))
+		{
+			m_EntityCache[index] = gamehelpers->IndexToReference(index);
+		}
+		else
+		{
+			g_pSM->LogError(myself, "SDKHooks::HandleEntityCreated - Got entity index out of range (%d)", index);
+		}
 	}
 #else
 	for (int i = 0; i < NUM_ENT_ENTRIES; i++)
 	{
 		if (gamehelpers->ReferenceToEntity(i) != NULL)
-			m_EntityExists.Set(i);
+			m_EntityCache[i] = gamehelpers->IndexToReference(i);
 	}
 #endif
 
@@ -415,14 +418,14 @@ void SDKHooks::OnClientPutInServer(int client)
 {
 	CBaseEntity *pPlayer = gamehelpers->ReferenceToEntity(client);
 
-	HandleEntityCreated(pPlayer, client);
+	HandleEntityCreated(pPlayer, client, gamehelpers->EntityToReference(pPlayer));
 }
 
 void SDKHooks::OnClientDisconnecting(int client)
 {
 	CBaseEntity *pEntity = gamehelpers->ReferenceToEntity(client);
 	
-	HandleEntityDeleted(pEntity, client);
+	HandleEntityDeleted(pEntity);
 }
 
 void SDKHooks::AddEntityListener(ISMEntityListener *listener)
@@ -862,16 +865,26 @@ void SDKHooks::Unhook(int entity, SDKHookType type, IPluginFunction *pCallback)
 void SDKHooks::OnEntityCreated(CBaseEntity *pEntity)
 {
 	// Call OnEntityCreated forward
-	int ref = gamehelpers->EntityToBCompatRef(pEntity);
+	int ref = gamehelpers->EntityToReference(pEntity);
 	int index = gamehelpers->ReferenceToIndex(ref);
 
 	// This can be -1 for player ents before any players have connected
-	if ((unsigned)index == INVALID_EHANDLE_INDEX || m_EntityExists.IsBitSet(index) || (index > 0 && index <= playerhelpers->GetMaxClients()))
+	if ((unsigned)index == INVALID_EHANDLE_INDEX || (index > 0 && index <= playerhelpers->GetMaxClients()))
 	{
 		return;
 	}
 
-	HandleEntityCreated(pEntity, ref);
+	if (!IsEntityIndexInRange(index))
+	{
+		g_pSM->LogError(myself, "SDKHooks::OnEntityCreated - Got entity index out of range (%d)", index);
+		return;
+	}
+
+	// The entity could already exist. The creation notifier fires twice for some paths
+	if (m_EntityCache[index] != ref)
+	{
+		HandleEntityCreated(pEntity, index, ref);
+	}
 }
 
 #ifdef GAMEDESC_CAN_CHANGE
@@ -1401,11 +1414,7 @@ bool SDKHooks::Hook_ShouldCollide(int collisionGroup, int contentsMask)
 	RETURN_META_VALUE(MRES_IGNORED, true);
 }
 
-#if SOURCE_ENGINE == SE_DOTA
-void SDKHooks::Hook_Spawn(CEntityKeyValues *kv)
-#else
 void SDKHooks::Hook_Spawn()
-#endif
 {
 	CBaseEntity *pEntity = META_IFACEPTR(CBaseEntity);
 	if (pEntity == NULL)
@@ -1444,11 +1453,7 @@ void SDKHooks::Hook_Spawn()
 	RETURN_META(MRES_IGNORED);
 }
 
-#if SOURCE_ENGINE == SE_DOTA
-void SDKHooks::Hook_SpawnPost(CEntityKeyValues *kv)
-#else
 void SDKHooks::Hook_SpawnPost()
-#endif
 {
 	Call(META_IFACEPTR(CBaseEntity), SDKHook_SpawnPost);
 }
@@ -1716,8 +1721,7 @@ void SDKHooks::Hook_UsePost(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 
 void SDKHooks::OnEntityDeleted(CBaseEntity *pEntity)
 {
-	int ref = gamehelpers->EntityToBCompatRef(pEntity);
-	int index = gamehelpers->ReferenceToIndex(ref);
+	int index = gamehelpers->ReferenceToIndex(gamehelpers->EntityToReference(pEntity));
 
 	// This can be -1 for player ents before any players have connected
 	if ((unsigned)index == INVALID_EHANDLE_INDEX || (index > 0 && index <= playerhelpers->GetMaxClients()))
@@ -1725,7 +1729,7 @@ void SDKHooks::OnEntityDeleted(CBaseEntity *pEntity)
 		return;
 	}
 
-	HandleEntityDeleted(pEntity, ref);
+	HandleEntityDeleted(pEntity);
 }
 
 void SDKHooks::Hook_VPhysicsUpdate(IPhysicsObject *pPhysics)
@@ -1835,9 +1839,10 @@ bool SDKHooks::Hook_WeaponSwitchPost(CBaseCombatWeapon *pWeapon, int viewmodelin
 	RETURN_META_VALUE(MRES_IGNORED, true);
 }
 
-void SDKHooks::HandleEntityCreated(CBaseEntity *pEntity, int ref)
+void SDKHooks::HandleEntityCreated(CBaseEntity *pEntity, int index, cell_t ref)
 {
 	const char *pName = gamehelpers->GetEntityClassname(pEntity);
+	cell_t bcompatRef = gamehelpers->EntityToBCompatRef(pEntity);
 
 	// Send OnEntityCreated to SM listeners
 	SourceHook::List<ISMEntityListener *>::iterator iter;
@@ -1849,15 +1854,17 @@ void SDKHooks::HandleEntityCreated(CBaseEntity *pEntity, int ref)
 	}
 
 	// Call OnEntityCreated forward
-	g_pOnEntityCreated->PushCell(ref);
+	g_pOnEntityCreated->PushCell(bcompatRef);
 	g_pOnEntityCreated->PushString(pName ? pName : "");
 	g_pOnEntityCreated->Execute(NULL);
 
-	m_EntityExists.Set(gamehelpers->ReferenceToIndex(ref));
+	m_EntityCache[index] = ref;
 }
 
-void SDKHooks::HandleEntityDeleted(CBaseEntity *pEntity, int ref)
+void SDKHooks::HandleEntityDeleted(CBaseEntity *pEntity)
 {
+	cell_t bcompatRef = gamehelpers->EntityToBCompatRef(pEntity);
+
 	// Send OnEntityDestroyed to SM listeners
 	SourceHook::List<ISMEntityListener *>::iterator iter;
 	ISMEntityListener *pListener = NULL;
@@ -1868,10 +1875,8 @@ void SDKHooks::HandleEntityDeleted(CBaseEntity *pEntity, int ref)
 	}
 
 	// Call OnEntityDestroyed forward
-	g_pOnEntityDestroyed->PushCell(ref);
+	g_pOnEntityDestroyed->PushCell(bcompatRef);
 	g_pOnEntityDestroyed->Execute(NULL);
 
 	Unhook(pEntity);
-
-	m_EntityExists.Set(gamehelpers->ReferenceToIndex(ref), false);
 }

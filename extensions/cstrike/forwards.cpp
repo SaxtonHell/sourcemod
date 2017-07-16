@@ -95,11 +95,10 @@ DETOUR_DECL_MEMBER2(DetourTerminateRound, void, float, delay, int, reason)
 	}
 #else
 //Windows CSGO
-//char __userpurge TerminateRound<al>(unsigned int a1<ecx>, signed int a2<edi>, unsigned int a3<xmm1>, int a4)
+//char __userpurge TerminateRound(int a1@<ecx>, float a2@<xmm1>, int *a3)
 // a1 - this
-// a2 - unknown
-// a3 - delay
-// a4 - reason
+// a2 - delay
+// a3 - reason
 DETOUR_DECL_MEMBER1(DetourTerminateRound, void, int, reason)
 {
 	float delay;
@@ -159,20 +158,12 @@ DETOUR_DECL_MEMBER1(DetourTerminateRound, void, int, reason)
 #endif
 }
 
-#if SOURCE_ENGINE == SE_CSGO
-DETOUR_DECL_MEMBER3(DetourCSWeaponDrop, void, CBaseEntity *, weapon, Vector, vec, bool, unknown)
-#else
 DETOUR_DECL_MEMBER3(DetourCSWeaponDrop, void, CBaseEntity *, weapon, bool, bDropShield, bool, bThrowForward)
-#endif
 {
 	if (g_pIgnoreCSWeaponDropDetour)
 	{
 		g_pIgnoreCSWeaponDropDetour = false;
-#if SOURCE_ENGINE == SE_CSGO
-		DETOUR_MEMBER_CALL(DetourCSWeaponDrop)(weapon, vec, unknown);
-#else
 		DETOUR_MEMBER_CALL(DetourCSWeaponDrop)(weapon, bDropShield, bThrowForward);
-#endif
 		return;
 	}
 
@@ -187,11 +178,7 @@ DETOUR_DECL_MEMBER3(DetourCSWeaponDrop, void, CBaseEntity *, weapon, bool, bDrop
 
 	if (result == Pl_Continue)
 	{
-#if SOURCE_ENGINE == SE_CSGO
-		DETOUR_MEMBER_CALL(DetourCSWeaponDrop)(weapon, vec, unknown);
-#else
 		DETOUR_MEMBER_CALL(DetourCSWeaponDrop)(weapon, bDropShield, bThrowForward);
-#endif
 	}
 
 	return;
@@ -208,7 +195,7 @@ bool CreateWeaponPriceDetour()
 		}
 	}
 
-#if SOURCE_ENGINE == SE_CSGO && defined(WIN32)
+#if SOURCE_ENGINE == SE_CSGO
 	void *pGetWeaponPriceAddress = GetWeaponPriceFunction();
 
 	if(!pGetWeaponPriceAddress)
@@ -270,7 +257,7 @@ bool CreateHandleBuyDetour()
 
 bool CreateCSWeaponDropDetour()
 {
-	DCSWeaponDrop = DETOUR_CREATE_MEMBER(DetourCSWeaponDrop, "CSWeaponDrop");
+	DCSWeaponDrop = DETOUR_CREATE_MEMBER(DetourCSWeaponDrop, WEAPONDROP_GAMEDATA_NAME);
 
 	if (DCSWeaponDrop != NULL)
 	{

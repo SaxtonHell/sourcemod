@@ -70,7 +70,8 @@ static CBaseEntity* GetGameRulesProxyEnt()
 	if (proxyEntRef == -1 || (pProxy = gamehelpers->ReferenceToEntity(proxyEntRef)) == NULL)
 	{
 		pProxy = FindEntityByNetClass(playerhelpers->GetMaxClients(), g_szGameRulesProxy);
-		proxyEntRef = gamehelpers->EntityToReference(pProxy);
+		if (pProxy)
+			proxyEntRef = gamehelpers->EntityToReference(pProxy);
 	}
 	
 	return pProxy;
@@ -177,13 +178,14 @@ static cell_t GameRules_GetProp(IPluginContext *pContext, const cell_t *params)
 
 	// This isn't in CS:S yet, but will be, doesn't hurt to add now, and will save us a build later
 #if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2 \
-	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS
+	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS || SOURCE_ENGINE == SE_CSGO
 	if (pProp->GetFlags() & SPROP_VARINT)
 	{
 		bit_count = sizeof(int) * 8;
 	}
 #endif
-	if (bit_count < 1)
+
+	if (bit_count < 1)
 	{
 		bit_count = params[2] * 8;
 	}
@@ -229,14 +231,10 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 	int offset;
 	int bit_count;
 
-	bool sendChange = true;
-	if (params[5] == 0)
-		sendChange = false;
-
 	void *pGameRules = GameRules();
 
 	CBaseEntity *pProxy = NULL;
-	if (sendChange && ((pProxy = GetGameRulesProxyEnt()) == NULL))
+	if ((pProxy = GetGameRulesProxyEnt()) == NULL)
 		return pContext->ThrowNativeError("Couldn't find gamerules proxy entity");
 	
 	if (!pGameRules || !g_szGameRulesProxy || !strcmp(g_szGameRulesProxy, ""))
@@ -244,10 +242,17 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 
 	pContext->LocalToString(params[1], &prop);
 
+#if SOURCE_ENGINE == SE_CSGO
+	if (!g_SdkTools.CanSetCSGOEntProp(prop))
+	{
+		return pContext->ThrowNativeError("Cannot set ent prop %s with core.cfg option \"FollowCSGOServerGuidelines\" enabled.", prop);
+	}
+#endif
+
 	FIND_PROP_SEND(DPT_Int, "integer");
 
 #if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS || SOURCE_ENGINE == SE_TF2 \
-	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS
+	|| SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_BMS || SOURCE_ENGINE == SE_CSGO
 	if (pProp->GetFlags() & SPROP_VARINT)
 	{
 		bit_count = sizeof(int) * 8;
@@ -262,35 +267,23 @@ static cell_t GameRules_SetProp(IPluginContext *pContext, const cell_t *params)
 	if (bit_count >= 17)
 	{
 		*(int32_t *)((intptr_t)pGameRules + offset) = params[2];
-		if (sendChange)
-		{
-			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-		}
 	}
 	else if (bit_count >= 9)
 	{
 		*(int16_t *)((intptr_t)pGameRules + offset) = (int16_t)params[2];
-		if (sendChange)
-		{
-			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-		}
 	}
 	else if (bit_count >= 2)
 	{
 		*(int8_t *)((intptr_t)pGameRules + offset) = (int8_t)params[2];
-		if (sendChange)
-		{
-			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-		}
 	}
 	else
 	{
 		*(bool *)((intptr_t)pGameRules + offset) = (params[2] == 0) ? false : true;
-		if (sendChange)
-		{
-			gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-		}
 	}
+
+	edict_t *proxyEdict = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy));
+	if (proxyEdict != NULL)
+		gamehelpers->SetEdictStateChanged(proxyEdict, offset);
 
 	return 0;
 }
@@ -323,14 +316,10 @@ static cell_t GameRules_SetPropFloat(IPluginContext *pContext, const cell_t *par
 	int offset;
 	int bit_count;
 
-	bool sendChange = true;
-	if (params[4] == 0)
-		sendChange = false;
-
 	void *pGameRules = GameRules();
 
 	CBaseEntity *pProxy = NULL;
-	if (sendChange && ((pProxy = GetGameRulesProxyEnt()) == NULL))
+	if ((pProxy = GetGameRulesProxyEnt()) == NULL)
 		return pContext->ThrowNativeError("Couldn't find gamerules proxy entity.");
 	
 	if (!pGameRules || !g_szGameRulesProxy || !strcmp(g_szGameRulesProxy, ""))
@@ -338,16 +327,22 @@ static cell_t GameRules_SetPropFloat(IPluginContext *pContext, const cell_t *par
 
 	pContext->LocalToString(params[1], &prop);
 
+#if SOURCE_ENGINE == SE_CSGO
+	if (!g_SdkTools.CanSetCSGOEntProp(prop))
+	{
+		return pContext->ThrowNativeError("Cannot set ent prop %s with core.cfg option \"FollowCSGOServerGuidelines\" enabled.", prop);
+	}
+#endif
+
 	FIND_PROP_SEND(DPT_Float, "float");
 
 	float newVal = sp_ctof(params[2]);
 
 	*(float *)((intptr_t)pGameRules + offset) = newVal;
 
-	if (sendChange)
-	{
-		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-	}
+	edict_t *proxyEdict = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy));
+	if (proxyEdict != NULL)
+		gamehelpers->SetEdictStateChanged(proxyEdict, offset);
 
 	return 0;
 }
@@ -386,20 +381,23 @@ static cell_t GameRules_SetPropEnt(IPluginContext *pContext, const cell_t *param
 	int offset;
 	int bit_count;
 
-	bool sendChange = true;
-	if (params[4] == 0)
-		sendChange = false;
-
 	void *pGameRules = GameRules();
 
 	CBaseEntity *pProxy = NULL;
-	if (sendChange && ((pProxy = GetGameRulesProxyEnt()) == NULL))
+	if ((pProxy = GetGameRulesProxyEnt()) == NULL)
 		return pContext->ThrowNativeError("Couldn't find gamerules proxy entity.");
 	
 	if (!pGameRules || !g_szGameRulesProxy || !strcmp(g_szGameRulesProxy, ""))
 		return pContext->ThrowNativeError("Gamerules lookup failed.");
 
 	pContext->LocalToString(params[1], &prop);
+
+#if SOURCE_ENGINE == SE_CSGO
+	if (!g_SdkTools.CanSetCSGOEntProp(prop))
+	{
+		return pContext->ThrowNativeError("Cannot set ent prop %s with core.cfg option \"FollowCSGOServerGuidelines\" enabled.", prop);
+	}
+#endif
 
 	FIND_PROP_SEND(DPT_Int, "integer");
 
@@ -423,10 +421,9 @@ static cell_t GameRules_SetPropEnt(IPluginContext *pContext, const cell_t *param
 		hndl.Set(pHandleEnt);
 	}
 
-	if (sendChange)
-	{
-		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-	}
+	edict_t *proxyEdict = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy));
+	if (proxyEdict != NULL)
+		gamehelpers->SetEdictStateChanged(proxyEdict, offset);
 
 	return 0;
 }
@@ -466,20 +463,23 @@ static cell_t GameRules_SetPropVector(IPluginContext *pContext, const cell_t *pa
 	int offset;
 	int bit_count;
 
-	bool sendChange = true;
-	if (params[4] == 0)
-		sendChange = false;
-
 	void *pGameRules = GameRules();
 
 	CBaseEntity *pProxy = NULL;
-	if (sendChange && ((pProxy = GetGameRulesProxyEnt()) == NULL))
+	if ((pProxy = GetGameRulesProxyEnt()) == NULL)
 		return pContext->ThrowNativeError("Couldn't find gamerules proxy entity.");
 	
 	if (!pGameRules || !g_szGameRulesProxy || !strcmp(g_szGameRulesProxy, ""))
 		return pContext->ThrowNativeError("Gamerules lookup failed.");
 
 	pContext->LocalToString(params[1], &prop);
+
+#if SOURCE_ENGINE == SE_CSGO
+	if (!g_SdkTools.CanSetCSGOEntProp(prop))
+	{
+		return pContext->ThrowNativeError("Cannot set ent prop %s with core.cfg option \"FollowCSGOServerGuidelines\" enabled.", prop);
+	}
+#endif
 
 	FIND_PROP_SEND(DPT_Vector, "vector");
 
@@ -492,10 +492,9 @@ static cell_t GameRules_SetPropVector(IPluginContext *pContext, const cell_t *pa
 	v->y = sp_ctof(vec[1]);
 	v->z = sp_ctof(vec[2]);
 
-	if (sendChange)
-	{
-		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-	}
+	edict_t *proxyEdict = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy));
+	if (proxyEdict != NULL)
+		gamehelpers->SetEdictStateChanged(proxyEdict, offset);
 
 	return 1;
 }
@@ -563,14 +562,10 @@ static cell_t GameRules_SetPropString(IPluginContext *pContext, const cell_t *pa
 	int offset;
 	int maxlen;
 
-	bool sendChange = true;
-	if (params[3] == 0)
-		sendChange = false;
-
 	void *pGameRules = GameRules();
 
 	CBaseEntity *pProxy = NULL;
-	if (sendChange && ((pProxy = GetGameRulesProxyEnt()) == NULL))
+	if ((pProxy = GetGameRulesProxyEnt()) == NULL)
 		return pContext->ThrowNativeError("Couldn't find gamerules proxy entity.");
 	
 	if (!pGameRules || !g_szGameRulesProxy || !strcmp(g_szGameRulesProxy, ""))
@@ -602,10 +597,9 @@ static cell_t GameRules_SetPropString(IPluginContext *pContext, const cell_t *pa
 	pContext->LocalToString(params[2], &src);
 	size_t len = strncopy(dest, src, maxlen);
 
-	if (sendChange)
-	{
-		gamehelpers->SetEdictStateChanged(gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy)), offset);
-	}
+	edict_t *proxyEdict = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pProxy));
+	if (proxyEdict != NULL)
+		gamehelpers->SetEdictStateChanged(proxyEdict, offset);
 
 	return len;
 }

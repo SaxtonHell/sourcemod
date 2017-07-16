@@ -31,22 +31,23 @@
  * Version: $Id$
  */
 
-new String:g_NewName[MAXPLAYERS+1][MAX_NAME_LENGTH];
+char g_NewName[MAXPLAYERS+1][MAX_NAME_LENGTH];
 
-PerformRename(client, target)
+void PerformRename(int client, int target)
 {
 	LogAction(client, target, "\"%L\" renamed \"%L\" to \"%s\")", client, target, g_NewName[target]);
 
 	SetClientName(target, g_NewName[target]);
 
+	g_NewName[target][0] = '\0';
 }
 
-public AdminMenu_Rename(Handle:topmenu, 
-					  TopMenuAction:action,
-					  TopMenuObject:object_id,
-					  param,
-					  String:buffer[],
-					  maxlength)
+public void AdminMenu_Rename(TopMenu topmenu, 
+					  TopMenuAction action,
+					  TopMenuObject object_id,
+					  int param,
+					  char[] buffer,
+					  int maxlength)
 {
 	if (action == TopMenuAction_DisplayOption)
 	{
@@ -58,9 +59,9 @@ public AdminMenu_Rename(Handle:topmenu,
 	}
 }
 
-DisplayRenameTargetMenu(int client)
+void DisplayRenameTargetMenu(int client)
 {
-	Menu menu = CreateMenu(MenuHandler_Rename);
+	Menu menu = new Menu(MenuHandler_Rename);
 	
 	char title[100];
 	Format(title, sizeof(title), "%T:", "Rename player", client);
@@ -72,7 +73,7 @@ DisplayRenameTargetMenu(int client)
 	menu.Display(client, MENU_TIME_FOREVER);
 }
 
-public MenuHandler_Rename(Menu menu, MenuAction action, int param1, int param2)
+public int MenuHandler_Rename(Menu menu, MenuAction action, int param1, int param2)
 {
 	if (action == MenuAction_End)
 	{
@@ -87,8 +88,8 @@ public MenuHandler_Rename(Menu menu, MenuAction action, int param1, int param2)
 	}
 	else if (action == MenuAction_Select)
 	{
-		decl String:info[32];
-		new userid, target;
+		char info[32];
+		int userid, target;
 		
 		menu.GetItem(param2, info, sizeof(info));
 		userid = StringToInt(info);
@@ -103,7 +104,7 @@ public MenuHandler_Rename(Menu menu, MenuAction action, int param1, int param2)
 		}
 		else
 		{
-			decl String:name[MAX_NAME_LENGTH];
+			char name[MAX_NAME_LENGTH];
 			GetClientName(target, name, sizeof(name));
 
 			RandomizeName(target);
@@ -114,22 +115,22 @@ public MenuHandler_Rename(Menu menu, MenuAction action, int param1, int param2)
 	}
 }
 
-RandomizeName(client)
+void RandomizeName(int client)
 {
-	decl String:name[MAX_NAME_LENGTH];
+	char name[MAX_NAME_LENGTH];
 	GetClientName(client, name, sizeof(name));
 
-	new len = strlen(name);
+	int len = strlen(name);
 	g_NewName[client][0] = '\0';
 
-	for (new i = 0; i < len; i++)
+	for (int i = 0; i < len; i++)
 	{
 		g_NewName[client][i] = name[GetRandomInt(0, len - 1)];
 	}
 	g_NewName[client][len] = '\0';
 }
 
-public Action:Command_Rename(client, args)
+public Action Command_Rename(int client, int args)
 {
 	if (args < 1)
 	{
@@ -137,10 +138,10 @@ public Action:Command_Rename(client, args)
 		return Plugin_Handled;
 	}
 
-	decl String:arg[MAX_NAME_LENGTH], String:arg2[MAX_NAME_LENGTH];
+	char arg[MAX_NAME_LENGTH], arg2[MAX_NAME_LENGTH];
 	GetCmdArg(1, arg, sizeof(arg));
 
-	new bool:randomize;
+	bool randomize;
 	if (args > 1)
 	{
 		GetCmdArg(2, arg2, sizeof(arg2));
@@ -150,8 +151,9 @@ public Action:Command_Rename(client, args)
 		randomize = true;
 	}
 	
-	decl String:target_name[MAX_TARGET_LENGTH];
-	decl target_list[MAXPLAYERS], target_count, bool:tn_is_ml;
+	char target_name[MAX_TARGET_LENGTH];
+	int target_list[MAXPLAYERS], target_count;
+	bool tn_is_ml;
 	
 	if ((target_count = ProcessTargetString(
 			arg,
@@ -163,48 +165,33 @@ public Action:Command_Rename(client, args)
 			sizeof(target_name),
 			tn_is_ml)) > 0)
 	{
-		if (target_count > 1)
+		if (tn_is_ml)
 		{
-			/* We cannot name everyone the same thing. */
-			randomize = true;
+			ShowActivity2(client, "[SM] ", "%t", "Renamed target", target_name);
+		}
+		else
+		{
+			ShowActivity2(client, "[SM] ", "%t", "Renamed target", "_s", target_name);
 		}
 
-		for (new i = 0; i < target_count; i++)
+		for (int i = 0; i < target_count; i++)
 		{
-			if(randomize)
+			if (randomize)
 			{
 				RandomizeName(target_list[i]);
 			}
 			else
 			{
-				Format(g_NewName[target_list[i]], MAX_NAME_LENGTH, "%s", arg2);
+				if (target_count > 1)
+				{
+					Format(g_NewName[target_list[i]], MAX_NAME_LENGTH, "%s %i", arg2, i+1);
+				}
+				else
+				{
+					Format(g_NewName[target_list[i]], MAX_NAME_LENGTH, "%s", arg2);
+				}
 			}
 			PerformRename(client, target_list[i]);
-		}
-
-		if (target_count == 1)
-		{
-			new target = target_list[ 0 ];
-
-			if (tn_is_ml)
-			{
-				ShowActivity2(client, "[SM] ", "%t", "Renamed single target", target_name, g_NewName[target]);
-			}
-			else
-			{
-				ShowActivity2(client, "[SM] ", "%t", "Renamed single target", "_s", target_name, g_NewName[target]);
-			}
-		}
-		else
-		{
-			if (tn_is_ml)
-			{
-				ShowActivity2(client, "[SM] ", "%t", "Renamed target", target_name);
-			}
-			else
-			{
-				ShowActivity2(client, "[SM] ", "%t", "Renamed target", "_s", target_name);
-			}
 		}
 	}
 	else
