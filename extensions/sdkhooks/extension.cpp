@@ -453,20 +453,17 @@ FeatureStatus SDKHooks::GetFeatureStatus(FeatureType type, const char *name)
  * Functions
  */
 
-void CopyCallbackList(const ke::Vector<HookList> &hookLists, ke::Vector<IPluginFunction *> &callbacks, int entity)
+static void PopulateCallbackList(const ke::Vector<HookList> &source, ke::Vector<IPluginFunction *> &destination, int entity)
 {
-	// we know that worse case we'll need one callback for each hooklist
-	// so lets get the reallocations out of the way first
-	callbacks.ensure(hookLists.length());
-
-	for (size_t entry = 0; entry < hookLists.length(); ++entry)
+	destination.ensure(8); /* Skip trivial allocations as AMTL uses length<<1. */
+	for (size_t iter = 0; iter < source.length(); ++iter)
 	{
-		if (hookLists[entry].entity != entity)
+		if (source[iter].entity != entity)
 		{
 			continue;
 		}
 
-		callbacks.append(hookLists[entry].callback);
+		destination.append(source[iter].callback);
 	}
 }
 
@@ -502,7 +499,7 @@ cell_t SDKHooks::Call(CBaseEntity *pEnt, SDKHookType type, CBaseEntity *pOther)
 		int other = gamehelpers->EntityToBCompatRef(pOther);
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1024,7 +1021,7 @@ void SDKHooks::Hook_FireBulletsPost(const FireBulletsInfo_t &info)
 		const char *weapon = pInfo->GetWeaponName();
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1068,7 +1065,7 @@ int SDKHooks::Hook_GetMaxHealth()
 		cell_t res = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1126,7 +1123,7 @@ int SDKHooks::HandleOnTakeDamageHook(CTakeDamageInfoHack &info, SDKHookType hook
 		cell_t res, ret = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1209,7 +1206,7 @@ int SDKHooks::HandleOnTakeDamageHookPost(CTakeDamageInfoHack &info, SDKHookType 
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1303,7 +1300,7 @@ bool SDKHooks::Hook_Reload()
 		cell_t res = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1342,7 +1339,7 @@ bool SDKHooks::Hook_ReloadPost()
 		cell_t origreturn = META_RESULT_ORIG_RET(bool) ? 1 : 0;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1390,7 +1387,7 @@ bool SDKHooks::Hook_ShouldCollide(int collisionGroup, int contentsMask)
 		cell_t res = 0;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1435,7 +1432,7 @@ void SDKHooks::Hook_Spawn()
 		cell_t res = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1531,7 +1528,7 @@ void SDKHooks::Hook_TraceAttack(CTakeDamageInfoHack &info, const Vector &vecDir,
 		cell_t res, ret = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1611,7 +1608,7 @@ void SDKHooks::Hook_TraceAttackPost(CTakeDamageInfoHack &info, const Vector &vec
 		int entity = gamehelpers->EntityToBCompatRef(pEntity);
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1656,7 +1653,7 @@ void SDKHooks::Hook_Use(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 		cell_t ret = Pl_Continue;
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
@@ -1700,7 +1697,7 @@ void SDKHooks::Hook_UsePost(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 		int caller = gamehelpers->EntityToBCompatRef(pCaller);
 
 		ke::Vector<IPluginFunction *> callbackList;
-		CopyCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
+		PopulateCallbackList(vtablehooklist[entry]->hooks, callbackList, entity);
 
 		for (entry = 0; entry < callbackList.length(); ++entry)
 		{
