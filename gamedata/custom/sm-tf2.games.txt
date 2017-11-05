@@ -17,9 +17,9 @@
 		{
 			"EquipWearable"
 			{
-				"windows"	"427"
-				"linux"		"428"
-				"mac"		"428"
+				"windows"	"430"
+				"linux"		"431"
+				"mac"		"431"
 			}
 		}
 	}
