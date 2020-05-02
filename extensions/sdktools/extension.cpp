@@ -46,6 +46,8 @@
 #include "clientnatives.h"
 #include "teamnatives.h"
 #include "filesystem.h"
+#include "am-string.h"
+
 /**
  * @file extension.cpp
  * @brief Implements SDK Tools extension code.
@@ -59,6 +61,7 @@ SH_DECL_HOOK1_void_vafmt(IVEngineServer, ClientCommand, SH_NOATTRIB, 0, edict_t 
 SDKTools g_SdkTools;		/**< Global singleton for extension's main interface */
 IServerGameEnts *gameents = NULL;
 IEngineTrace *enginetrace = NULL;
+ISpatialPartition *partition = NULL;
 IEngineSound *engsound = NULL;
 INetworkStringTableContainer *netstringtables = NULL;
 IServerPluginHelpers *pluginhelpers = NULL;
@@ -98,6 +101,19 @@ extern sp_nativeinfo_t g_ClientNatives[];
 
 static void InitSDKToolsAPI();
 
+#if SOURCE_ENGINE == SE_CSGO
+CDetour *g_WriteBaselinesDetour = NULL;
+
+DETOUR_DECL_MEMBER3(CNetworkStringTableContainer__WriteBaselines, void, char const *, mapName, void *, buffer, int, currentTick)
+{
+	// Replace nAtTick with INT_MAX to work around CS:GO engine bug.
+	// Due to a timing issue in the engine, stringtable entries added in OnConfigsExecuted can be considered
+	// to have been added in the future for the first client that connects, which causes them to be ignored
+	// when iterating for networking, which triggers a Host_Error encoding the CreateStringTable netmsg.
+	return DETOUR_MEMBER_CALL(CNetworkStringTableContainer__WriteBaselines)(mapName, buffer, INT_MAX);
+}
+#endif
+
 bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	HandleError err;
@@ -128,7 +144,7 @@ bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	g_CallHandle = handlesys->CreateType("ValveCall", this, 0, NULL, NULL, myself->GetIdentity(), &err);
 	if (g_CallHandle == 0)
 	{
-		snprintf(error, maxlength, "Could not create call handle type (err: %d)", err);	
+		ke::SafeSprintf(error, maxlength, "Could not create call handle type (err: %d)", err);	
 		return false;
 	}
 
@@ -142,7 +158,7 @@ bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	{
 		handlesys->RemoveType(g_CallHandle, myself->GetIdentity());
 		g_CallHandle = 0;
-		snprintf(error, maxlength, "Could not create traceray handle type (err: %d)", err);
+		ke::SafeSprintf(error, maxlength, "Could not create traceray handle type (err: %d)", err);
 		return false;
 	}
 
@@ -183,6 +199,13 @@ bool SDKTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	m_CSGOBadList.init();
 	m_CSGOBadList.add("m_bIsValveDS");
 	m_CSGOBadList.add("m_bIsQuestEligible");
+
+	g_WriteBaselinesDetour = DETOUR_CREATE_MEMBER(CNetworkStringTableContainer__WriteBaselines, "WriteBaselines");
+	if (g_WriteBaselinesDetour) {
+		g_WriteBaselinesDetour->EnableDetour();
+	} else {
+		g_pSM->LogError(myself, "Failed to find WriteBaselines signature -- stringtable error workaround disabled.");
+	}
 #endif
 
 	return true;
@@ -213,6 +236,13 @@ void SDKTools::SDK_OnUnload()
 	}
 	g_RegCalls.clear();
 	ShutdownHelpers();
+
+#if SOURCE_ENGINE == SE_CSGO
+	if (g_WriteBaselinesDetour) {
+		g_WriteBaselinesDetour->DisableDetour();
+		g_WriteBaselinesDetour = NULL;
+	}
+#endif
 
 	if (g_pAcceptInput)
 	{
@@ -267,6 +297,7 @@ bool SDKTools::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool
 	GET_V_IFACE_ANY(GetServerFactory, gameents, IServerGameEnts, INTERFACEVERSION_SERVERGAMEENTS);
 	GET_V_IFACE_ANY(GetEngineFactory, engsound, IEngineSound, IENGINESOUND_SERVER_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, enginetrace, IEngineTrace, INTERFACEVERSION_ENGINETRACE_SERVER);
+	GET_V_IFACE_ANY(GetEngineFactory, partition, ISpatialPartition, INTERFACEVERSION_SPATIALPARTITION);
 	GET_V_IFACE_ANY(GetEngineFactory, netstringtables, INetworkStringTableContainer, INTERFACENAME_NETWORKSTRINGTABLESERVER);
 	GET_V_IFACE_ANY(GetEngineFactory, pluginhelpers, IServerPluginHelpers, INTERFACEVERSION_ISERVERPLUGINHELPERS);
 	GET_V_IFACE_ANY(GetServerFactory, serverClients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
@@ -385,7 +416,7 @@ bool SDKTools::LevelInit(char const *pMapName, char const *pMapEntities, char co
 
 	while (n <= count)
 	{
-		snprintf(key, sizeof(key), "SlapSound%d", n);
+		ke::SafeSprintf(key, sizeof(key), "SlapSound%d", n);
 		if ((name=g_pGameConf->GetKeyValue(key)))
 		{
 			engsound->PrecacheSound(name, true);
@@ -436,7 +467,7 @@ bool SDKTools::ProcessCommandTarget(cmd_target_info_t *info)
 		info->num_targets = 1;
 		info->reason = COMMAND_TARGET_VALID;
 		info->target_name_style = COMMAND_TARGETNAME_RAW;
-		snprintf(info->target_name, info->target_name_maxlength, "%s", pTarget->GetName());
+		ke::SafeStrcpy(info->target_name, info->target_name_maxlength, pTarget->GetName());
 		return true;
 	}
 	else if (strcmp(info->pattern, "@spec") == 0)
@@ -462,7 +493,7 @@ bool SDKTools::ProcessCommandTarget(cmd_target_info_t *info)
 		}
 		info->reason = info->num_targets > 0 ? COMMAND_TARGET_VALID : COMMAND_TARGET_EMPTY_FILTER;
 		info->target_name_style = COMMAND_TARGETNAME_ML;
-		snprintf(info->target_name, info->target_name_maxlength, "all spectators");
+		ke::SafeStrcpy(info->target_name, info->target_name_maxlength, "all spectators");
 		return true;
 	}
 

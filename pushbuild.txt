@@ -5,11 +5,11 @@ joys of buildbot, part 4: a transient mummy is perplexed by a broken wand
 buildbot has horrible bloogs
 I am the very model of a modern major general
 It's no wonder the build always falls over when we call it pushing.
-h
+H
 i
 D
 S
-!!!!!!
+!!!!
 joys of buildbot, part 5: a watermelon's diatribes need not be cause for spilling the queen's tea
 crab
 joys of buildbot, part 6: a merry metal matchturtle mocks mostly and mainly in Madrid.
@@ -24,7 +24,7 @@ ur
 oh, it's so cute. she sometimes takes a little pack of mayonnaise, and she'll squirt it in her mouth all over, and then she'll take an egg and kind of... mmmmm. she calls it a mayonegg
 not me
 javaliabuf64k..
-"line 29" rhymes.. kinda. <-- CONFIRMED
+"line 29" rhymes.. kinda. <--- CONFIRMED
 The Patty Winters show this morning was about javalia.
 jksrhiojkhflhadsglk
 The Patty Winters Show this morning was about UFOs That Kill.
@@ -34,7 +34,7 @@ THIS IS NOT AN EXIT.
 ABANDON ALL HOPE YE WHO ENTER HERE.
 egg!!
 blimey!
-this->crab
+this.crab
 jibbly jibbly jibbly
 oh mercurial
 hi
@@ -71,3 +71,6 @@ R.I.P. Wade Boggs
 Your tier1 tower is under attack..
 Christmas!!!
 the mousse angles are smooth
+spoilers
+oh key you're so good to me
+well, ok rude

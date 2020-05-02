@@ -272,7 +272,10 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 		return;
 	}
 
-	if (strcmp(sArgs, "timeleft", false) == 0)
+	if (IsChatTrigger())
+	{
+	}
+	else if (strcmp(sArgs, "timeleft", false) == 0)
 	{
 		ShowTimeLeft(client, TIMELEFT_ALL_MAYBE);
 	}

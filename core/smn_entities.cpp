@@ -94,6 +94,7 @@ enum PropFieldType
 	PropField_Variant,			/**< Valid for variants/any. (User must know type) */
 };
 
+// From game/server/variant_t.h, same on all supported games.
 class variant_t
 {
 public:
@@ -109,6 +110,15 @@ public:
 	
 	CBaseHandle eVal;
 	fieldtype_t fieldType;
+};
+
+// From game/server/baseentity.h, same on all supported games.
+struct inputdata_t
+{
+	CBaseEntity *pActivator;		// The entity that initially caused this chain of output events.
+	CBaseEntity *pCaller;			// The entity that fired this particular output.
+	variant_t value;				// The data parameter for this output.
+	int nOutputID;					// The unique ID of the output that was fired.
 };
 
 inline bool CanSetPropName(const char *pszPropName)
@@ -276,6 +286,47 @@ static cell_t RemoveEdict(IPluginContext *pContext, const cell_t *params)
 	}
 
 	engine->RemoveEdict(pEdict);
+
+	return 1;
+}
+
+static cell_t RemoveEntity(IPluginContext *pContext, const cell_t *params)
+{
+	auto *pEntity = GetEntity(params[1]);
+	if (!pEntity)
+	{
+		return pContext->ThrowNativeError("Entity %d (%d) is not a valid entity", g_HL2.ReferenceToIndex(params[1]), params[1]);
+	}
+
+	// Some games have UTIL_Remove exposed on IServerTools, but for consistence, we'll
+	// use this method for all. Results in DeathNotice( this ) being called on parent,
+	// and parent being cleared (both if any parent) before UTIL_Remove is called.
+	static inputfunc_t fnKillEntity = nullptr;
+	if (!fnKillEntity)
+	{
+		// Get world, as other ents aren't guaranteed to inherit full datadesc (but kill func is same for all)
+		CBaseEntity *pGetterEnt = g_HL2.ReferenceToEntity(0);
+		if (pGetterEnt == nullptr)
+		{
+			// If we don't have a world entity yet, we'll have to rely on the given entity. Does this even make sense???
+			pGetterEnt = pEntity;
+		}
+
+		datamap_t *pMap = g_HL2.GetDataMap(pGetterEnt);
+
+		sm_datatable_info_t info;
+		if (!g_HL2.FindDataMapInfo(pMap, "InputKill", &info))
+		{
+			return pContext->ThrowNativeError("Failed to find Kill input!");
+		}
+
+		fnKillEntity = info.prop->inputFunc;
+	}
+
+	// Input data is ignored for this. No need to initialize
+	static inputdata_t data;
+
+	(pEntity->*fnKillEntity)(data);
 
 	return 1;
 }
@@ -1328,7 +1379,7 @@ static cell_t GetEntProp(IPluginContext *pContext, const cell_t *params)
 			// This isn't in CS:S yet, but will be, doesn't hurt to add now, and will save us a build later
 #if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS \
 	|| SOURCE_ENGINE == SE_BMS || SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_TF2 \
-	|| SOURCE_ENGINE == SE_CSGO
+	|| SOURCE_ENGINE == SE_CSGO || SOURCE_ENGINE == SE_BLADE
 			if (pProp->GetFlags() & SPROP_VARINT)
 			{
 				bit_count = sizeof(int) * 8;
@@ -1447,7 +1498,7 @@ static cell_t SetEntProp(IPluginContext *pContext, const cell_t *params)
 			// This isn't in CS:S yet, but will be, doesn't hurt to add now, and will save us a build later
 #if SOURCE_ENGINE == SE_CSS || SOURCE_ENGINE == SE_HL2DM || SOURCE_ENGINE == SE_DODS \
 	|| SOURCE_ENGINE == SE_BMS || SOURCE_ENGINE == SE_SDK2013 || SOURCE_ENGINE == SE_TF2 \
-	|| SOURCE_ENGINE == SE_CSGO
+	|| SOURCE_ENGINE == SE_CSGO || SOURCE_ENGINE == SE_BLADE
 			if (pProp->GetFlags() & SPROP_VARINT)
 			{
 				bit_count = sizeof(int) * 8;
@@ -2544,7 +2595,7 @@ static cell_t GetEntityFlags(IPluginContext *pContext, const cell_t *params)
 
 	for (int32_t i = 0; i < 32; i++)
 	{
-		int32_t flag = (1<<i);
+		int32_t flag = (1U<<i);
 		if ((actual_flags & flag) == flag)
 		{
 			sm_flags |= SDKEntFlagToSMEntFlag(flag);
@@ -2590,7 +2641,7 @@ static cell_t SetEntityFlags(IPluginContext *pContext, const cell_t *params)
 
 	for (int32_t i = 0; i < 32; i++)
 	{
-		int32_t flag = (1<<i);
+		int32_t flag = (1U<<i);
 		if ((sm_flags & flag) == flag)
 		{
 			actual_flags |= SMEntFlagToSDKEntFlag(flag);
@@ -2609,7 +2660,12 @@ static cell_t GetEntityAddress(IPluginContext *pContext, const cell_t *params)
 	{
 		return pContext->ThrowNativeError("Entity %d (%d) is invalid", g_HL2.ReferenceToIndex(params[1]), params[1]);
 	}
+
+#ifdef PLATFORM_X86
 	return reinterpret_cast<cell_t>(pEntity);
+#else
+	return g_SourceMod.ToPseudoAddress(pEntity);
+#endif
 }
 
 REGISTER_NATIVES(entityNatives)
@@ -2640,6 +2696,7 @@ REGISTER_NATIVES(entityNatives)
 	{"IsEntNetworkable",		IsEntNetworkable},
 	{"IsValidEdict",			IsValidEdict},
 	{"IsValidEntity",			IsValidEntity},
+	{"RemoveEntity",			RemoveEntity},
 	{"RemoveEdict",				RemoveEdict},
 	{"SetEdictFlags",			SetEdictFlags},
 	{"SetEntData",				SetEntData},

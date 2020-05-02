@@ -36,6 +36,7 @@
 #include "iplayerinfo.h"
 #include "ISDKTools.h"
 #include "forwards.h"
+#include "util_cstrike.h"
 
 /**
  * @file extension.cpp
@@ -50,6 +51,7 @@ IGameConfig *g_pGameConf = NULL;
 IGameEventManager2 *gameevents = NULL;
 bool hooked_everything = false;
 int g_msgHintText = -1;
+CGlobalVars *gpGlobals;
 
 SMEXT_LINK(&g_CStrike);
 
@@ -62,7 +64,7 @@ bool CStrike::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #if SOURCE_ENGINE != SE_CSGO
 	if (strcmp(g_pSM->GetGameFolderName(), "cstrike") != 0)
 	{
-		snprintf(error, maxlength, "Cannot Load Cstrike Extension on mods other than CS:S and CS:GO");
+		ke::SafeStrcpy(error, maxlength, "Cannot Load Cstrike Extension on mods other than CS:S and CS:GO");
 		return false;
 	}
 #endif
@@ -75,7 +77,7 @@ bool CStrike::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	{
 		if (error)
 		{
-			snprintf(error, maxlength, "Could not read sm-cstrike.games: %s", conf_error);
+			ke::SafeSprintf(error, maxlength, "Could not read sm-cstrike.games: %s", conf_error);
 		}
 		return false;
 	}
@@ -106,6 +108,7 @@ bool CStrike::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool 
 {
 	GET_V_IFACE_CURRENT(GetEngineFactory, gameevents, IGameEventManager2, INTERFACEVERSION_GAMEEVENTSMANAGER2);
 	GET_V_IFACE_CURRENT(GetEngineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
+	gpGlobals = ismm->GetCGlobals();
 
 	return true;
 }
@@ -126,6 +129,10 @@ void CStrike::SDK_OnUnload()
 	forwards->ReleaseForward(g_pPriceForward);
 	forwards->ReleaseForward(g_pTerminateRoundForward);
 	forwards->ReleaseForward(g_pCSWeaponDropForward);
+
+#if SOURCE_ENGINE == SE_CSGO
+	ClearHashMaps();
+#endif
 }
 
 void CStrike::SDK_OnAllLoaded()
@@ -146,6 +153,10 @@ void CStrike::SDK_OnAllLoaded()
 	hooked_everything = true;
 
 	SM_GET_LATE_IFACE(BINTOOLS, g_pBinTools);
+
+#if SOURCE_ENGINE == SE_CSGO
+	CreateHashMaps();
+#endif
 }
 
 bool CStrike::QueryRunning(char *error, size_t maxlength)

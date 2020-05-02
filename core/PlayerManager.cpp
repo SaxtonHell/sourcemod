@@ -30,6 +30,7 @@
  */
 
 #include "PlayerManager.h"
+#include "sourcemod.h"
 #include "IAdminSystem.h"
 #include "ConCmdManager.h"
 #include "MenuStyle_Valve.h"
@@ -63,7 +64,7 @@ const unsigned int *g_NumPlayersToAuth = NULL;
 int lifestate_offset = -1;
 List<ICommandTargetProcessor *> target_processors;
 
-ConVar sm_debug_connect("sm_debug_connect", "0", 0, "Log Debug information about potential connection issues.");
+ConVar sm_debug_connect("sm_debug_connect", "1", 0, "Log Debug information about potential connection issues.");
 
 SH_DECL_HOOK5(IServerGameClients, ClientConnect, SH_NOATTRIB, 0, bool, edict_t *, const char *, const char *, char *, int);
 SH_DECL_HOOK2_void(IServerGameClients, ClientPutInServer, SH_NOATTRIB, 0, edict_t *, const char *);
@@ -92,6 +93,12 @@ SH_DECL_EXTERN1_void(ConCommand, Dispatch, SH_NOATTRIB, false, const CCommand &)
 #else
 SH_DECL_EXTERN0_void(ConCommand, Dispatch, SH_NOATTRIB, false);
 #endif
+SH_DECL_HOOK2_void(IVEngineServer, ClientPrintf, SH_NOATTRIB, 0, edict_t *, const char *);
+
+static void PrintfBuffer_FrameAction(void *data)
+{
+	g_Players.OnPrintfFrameAction(static_cast<unsigned int>(reinterpret_cast<uintptr_t>(data)));
+}
 
 ConCommand *maxplayersCmd = NULL;
 
@@ -102,7 +109,7 @@ class KickPlayerTimer : public ITimedEvent
 public:
 	ResultType OnTimer(ITimer *pTimer, void *pData)
 	{
-		int userid = (int)pData;
+		int userid = (int)(intptr_t)pData;
 		int client = g_Players.GetClientOfUserId(userid);
 		if (client)
 		{
@@ -172,6 +179,7 @@ void PlayerManager::OnSourceModAllInitialized()
 #elif SOURCE_ENGINE > SE_EYE // 2013/orangebox, but not original orangebox.
 	SH_ADD_HOOK(IServerGameDLL, SetServerHibernation, gamedll, SH_MEMBER(this, &PlayerManager::OnServerHibernationUpdate), true);
 #endif
+	SH_ADD_HOOK(IVEngineServer, ClientPrintf, engine, SH_MEMBER(this, &PlayerManager::OnClientPrintf), false);
 
 	sharesys->AddInterface(NULL, this);
 
@@ -225,6 +233,7 @@ void PlayerManager::OnSourceModShutdown()
 #elif SOURCE_ENGINE > SE_EYE // 2013/orangebox, but not original orangebox.
 	SH_REMOVE_HOOK(IServerGameDLL, SetServerHibernation, gamedll, SH_MEMBER(this, &PlayerManager::OnServerHibernationUpdate), true);
 #endif
+	SH_REMOVE_HOOK(IVEngineServer, ClientPrintf, engine, SH_MEMBER(this, &PlayerManager::OnClientPrintf), false);
 
 	/* Release forwards */
 	forwardsys->ReleaseForward(m_clconnect);
@@ -272,7 +281,7 @@ ConfigResult PlayerManager::OnSourceModConfigChanged(const char *key,
 		} else if (strcasecmp(value, "off") == 0) {
 			m_QueryLang = false;
 		} else {
-			ke::SafeSprintf(error, maxlength, "Invalid value: must be \"on\" or \"off\"");
+			ke::SafeStrcpy(error, maxlength, "Invalid value: must be \"on\" or \"off\"");
 			return ConfigResult_Reject;
 		}
 		return ConfigResult_Accept;
@@ -283,7 +292,7 @@ ConfigResult PlayerManager::OnSourceModConfigChanged(const char *key,
 		} else if ( strcasecmp(value, "no") == 0) {
 			m_bAuthstringValidation = false;
 		} else {
-			ke::SafeSprintf(error, maxlength, "Invalid value: must be \"yes\" or \"no\"");
+			ke::SafeStrcpy(error, maxlength, "Invalid value: must be \"yes\" or \"no\"");
 			return ConfigResult_Reject;
 		}
 		return ConfigResult_Accept;
@@ -843,6 +852,88 @@ void PlayerManager::OnClientDisconnect_Post(edict_t *pEntity)
 	{
 		pListener = (*iter);
 		pListener->OnClientDisconnected(client);
+	}
+}
+
+void PlayerManager::OnClientPrintf(edict_t *pEdict, const char *szMsg)
+{
+	int client = IndexOfEdict(pEdict);
+
+	CPlayer &player = m_Players[client];
+	if (!player.IsConnected())
+		RETURN_META(MRES_IGNORED);
+
+	INetChannel *pNetChan = static_cast<INetChannel *>(engine->GetPlayerNetInfo(client));
+	if (pNetChan == NULL)
+		RETURN_META(MRES_IGNORED);
+
+	size_t nMsgLen = strlen(szMsg);
+#if SOURCE_ENGINE == SE_EPISODEONE || SOURCE_ENGINE == SE_DARKMESSIAH
+	static const int nNumBitsWritten = 0;
+#else
+	int nNumBitsWritten = pNetChan->GetNumBitsWritten(false); // SVC_Print uses unreliable netchan
+#endif
+
+	// if the msg is bigger than allowed then just let it fail
+	if (nMsgLen + 1 >= SVC_Print_BufferSize) // +1 for NETMSG_TYPE_BITS
+		RETURN_META(MRES_IGNORED);
+
+	// enqueue msgs if we'd overflow the SVC_Print buffer (+7 as ceil)
+	if (!player.m_PrintfBuffer.empty() || (nNumBitsWritten + NETMSG_TYPE_BITS + 7) / 8 + nMsgLen >= SVC_Print_BufferSize)
+	{
+		// Don't send any more messages for this player until the buffer is empty.
+		// Queue up a gameframe hook to empty the buffer (if we haven't already)
+		if (player.m_PrintfBuffer.empty())
+			g_SourceMod.AddFrameAction(PrintfBuffer_FrameAction, (void *)(uintptr_t)player.GetSerial());
+
+		player.m_PrintfBuffer.append(szMsg);
+
+		RETURN_META(MRES_SUPERCEDE);
+	}
+
+	RETURN_META(MRES_IGNORED);
+}
+
+void PlayerManager::OnPrintfFrameAction(unsigned int serial)
+{
+	int client = GetClientFromSerial(serial);
+	CPlayer &player = m_Players[client];
+	if (!player.IsConnected())
+	{
+		player.ClearNetchannelQueue();
+		return;
+	}
+
+	INetChannel *pNetChan = static_cast<INetChannel *>(engine->GetPlayerNetInfo(client));
+	if (pNetChan == NULL)
+	{
+		player.ClearNetchannelQueue();
+		return;
+	}
+
+	while (!player.m_PrintfBuffer.empty())
+	{
+#if SOURCE_ENGINE == SE_EPISODEONE || SOURCE_ENGINE == SE_DARKMESSIAH
+		static const int nNumBitsWritten = 0;
+#else
+		int nNumBitsWritten = pNetChan->GetNumBitsWritten(false); // SVC_Print uses unreliable netchan
+#endif
+
+		ke::AString &string = player.m_PrintfBuffer.front();
+
+		// stop if we'd overflow the SVC_Print buffer  (+7 as ceil)
+		if ((nNumBitsWritten + NETMSG_TYPE_BITS + 7) / 8 + string.length() >= SVC_Print_BufferSize)
+			break;
+
+		SH_CALL(engine, &IVEngineServer::ClientPrintf)(player.m_pEdict, string.chars());
+
+		player.m_PrintfBuffer.popFront();
+	}
+
+	if (!player.m_PrintfBuffer.empty())
+	{
+		// continue processing it on the next gameframe as buffer is not empty
+		g_SourceMod.AddFrameAction(PrintfBuffer_FrameAction, (void *)(uintptr_t)player.GetSerial());
 	}
 }
 
@@ -1464,7 +1555,10 @@ void PlayerManager::InvalidatePlayer(CPlayer *pPlayer)
 		}
 	}
 	
-	m_UserIdLookUp[engine->GetPlayerUserId(pPlayer->m_pEdict)] = 0;
+	auto userid = engine->GetPlayerUserId(pPlayer->m_pEdict);
+	if (userid != -1)
+		m_UserIdLookUp[userid] = 0;
+
 	pPlayer->Disconnect();
 }
 
@@ -1955,7 +2049,8 @@ void CPlayer::Initialize(const char *name, const char *ip, edict_t *pEntity)
 	|| SOURCE_ENGINE == SE_DODS  \
 	|| SOURCE_ENGINE == SE_HL2DM \
 	|| SOURCE_ENGINE == SE_BMS   \
-	|| SOURCE_ENGINE == SE_INSURGENCY
+	|| SOURCE_ENGINE == SE_INSURGENCY \
+	|| SOURCE_ENGINE == SE_DOI
 	m_pIClient = engine->GetIServer()->GetClient(m_iIndex - 1);
 #else
   #if SOURCE_ENGINE == SE_SDK2013
@@ -2039,18 +2134,18 @@ void CPlayer::UpdateAuthIds()
 	}
 	
 	char szAuthBuffer[64];
-	snprintf(szAuthBuffer, sizeof(szAuthBuffer), "STEAM_%u:%u:%u", steam2universe, m_SteamId.GetAccountID() & 1, m_SteamId.GetAccountID() >> 1);
+	ke::SafeSprintf(szAuthBuffer, sizeof(szAuthBuffer), "STEAM_%u:%u:%u", steam2universe, m_SteamId.GetAccountID() & 1, m_SteamId.GetAccountID() >> 1);
 	
 	m_Steam2Id = szAuthBuffer;
 	
 	// TODO: make sure all hl2sdks' steamclientpublic.h have k_unSteamUserDesktopInstance.
 	if (m_SteamId.GetUnAccountInstance() == 1 /* k_unSteamUserDesktopInstance */)
 	{
-		snprintf(szAuthBuffer, sizeof(szAuthBuffer), "[U:%u:%u]", m_SteamId.GetEUniverse(), m_SteamId.GetAccountID());
+		ke::SafeSprintf(szAuthBuffer, sizeof(szAuthBuffer), "[U:%u:%u]", m_SteamId.GetEUniverse(), m_SteamId.GetAccountID());
 	}
 	else
 	{
-		snprintf(szAuthBuffer, sizeof(szAuthBuffer), "[U:%u:%u:%u]", m_SteamId.GetEUniverse(), m_SteamId.GetAccountID(), m_SteamId.GetUnAccountInstance());
+		ke::SafeSprintf(szAuthBuffer, sizeof(szAuthBuffer), "[U:%u:%u:%u]", m_SteamId.GetEUniverse(), m_SteamId.GetAccountID(), m_SteamId.GetUnAccountInstance());
 	}
 	
 	m_Steam3Id = szAuthBuffer;
@@ -2134,6 +2229,13 @@ void CPlayer::Disconnect()
 #if SOURCE_ENGINE == SE_CSGO
 	m_LanguageCookie = InvalidQueryCvarCookie;
 #endif
+	ClearNetchannelQueue();
+}
+
+void CPlayer::ClearNetchannelQueue(void)
+{
+	while (!m_PrintfBuffer.empty())
+		m_PrintfBuffer.popFront();
 }
 
 void CPlayer::SetName(const char *name)
@@ -2224,7 +2326,7 @@ unsigned int CPlayer::GetSteamAccountID(bool validated)
 {
 	if (!IsFakeClient() && (!validated || IsAuthStringValidated()))
 	{
-		const CSteamID &id = GetSteamId();
+		const CSteamID &id = GetSteamId(validated);
 		if (id.IsValid())
 			return id.GetAccountID();
 	}
@@ -2351,7 +2453,7 @@ void CPlayer::Kick(const char *str)
 	}
 	else
 	{
-#if SOURCE_ENGINE == SE_CSGO
+#if SOURCE_ENGINE == SE_CSGO || SOURCE_ENGINE == SE_BLADE
 		pClient->Disconnect(str);
 #else
 		pClient->Disconnect("%s", str);
@@ -2469,7 +2571,7 @@ void CPlayer::DoBasicAdminChecks()
 		if (!g_Players.CheckSetAdminName(client, this, id))
 		{
 			int userid = engine->GetPlayerUserId(m_pEdict);
-			g_Timers.CreateTimer(&s_KickPlayerTimer, 0.1f, (void *)userid, 0);
+			g_Timers.CreateTimer(&s_KickPlayerTimer, 0.1f, (void *)(intptr_t)userid, 0);
 		}
 		return;
 	}

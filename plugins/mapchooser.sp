@@ -100,8 +100,8 @@ int g_mapFileSerial = -1;
 MapChange g_ChangeTime;
 
 Handle g_MapVoteTimerInitializedForward = null;
-Handle g_NominationsResetForward = null;
-Handle g_MapVoteStartedForward = null;
+GlobalForward g_NominationsResetForward;
+GlobalForward g_MapVoteStartedForward;
 Handle g_MapVoteItemSelectedForward = null;
 Handle g_MapVoteItemDisplayedForward = null;
 Handle g_MapVoteFinishedForward = null;
@@ -137,7 +137,7 @@ public void OnPluginStart()
 	g_Cvar_Extend = CreateConVar("sm_mapvote_extend", "0", "Number of extensions allowed each map.", _, true, 0.0);
 	g_Cvar_DontChange = CreateConVar("sm_mapvote_dontchange", "1", "Specifies if a 'Don't Change' option should be added to early votes", _, true, 0.0);
 	g_Cvar_VoteDuration = CreateConVar("sm_mapvote_voteduration", "20", "Specifies how long the mapvote should be available for.", _, true, 5.0);
-	g_Cvar_RunOff = CreateConVar("sm_mapvote_runoff", "0", "Hold run of votes if winning choice is less than a certain margin", _, true, 0.0, true, 1.0);
+	g_Cvar_RunOff = CreateConVar("sm_mapvote_runoff", "0", "Hold runoff votes if winning choice is less than a certain margin", _, true, 0.0, true, 1.0);
 	g_Cvar_RunOffPercent = CreateConVar("sm_mapvote_runoffpercent", "50", "If winning choice has less than this percent of votes, hold a runoff", _, true, 0.0, true, 100.0);
 	g_Cvar_NumSpacers = CreateConVar("sm_mapvote_numspacers", "2", "The amount of spacers to include in the map vote. Or the maximum amount of spacers if random spacer mode is enabled", _, true, 0.0, true, 2.0);
 	g_Cvar_SpacerMode = CreateConVar("sm_mapvote_spacermode", "1", "0 - Map votes will always include sm_mapvote_numspacers spacers. 1 - Map votes will randomly contain a maximum of sm_mapvote_numspacers spacers", _, true, 0.0, true, 1.0);
@@ -191,8 +191,8 @@ public void OnPluginStart()
 	}
 	
 	g_MapVoteTimerInitializedForward = CreateGlobalForward("OnMapVoteTimerInitialized", ET_Ignore, Param_Float);
-	g_NominationsResetForward = CreateGlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
-	g_MapVoteStartedForward = CreateGlobalForward("OnMapVoteStarted", ET_Ignore);
+	g_NominationsResetForward = new GlobalForward("OnNominationRemoved", ET_Ignore, Param_String, Param_Cell);
+	g_MapVoteStartedForward = new GlobalForward("OnMapVoteStarted", ET_Ignore);
 	g_MapVoteItemSelectedForward = CreateGlobalForward("OnMapVoteItemSelected", ET_Ignore, Param_Cell, Param_String, Param_String);
 	g_MapVoteItemDisplayedForward = CreateGlobalForward("OnMapVoteItemDisplayed", ET_Hook, Param_Cell, Param_String, Param_String, Param_Cell);
 	g_MapVoteFinishedForward = CreateGlobalForward("OnMapVoteFinished", ET_Ignore, Param_Cell, Param_String);
@@ -270,6 +270,7 @@ public void OnMapEnd()
 	
 	char map[PLATFORM_MAX_PATH];
 	GetCurrentMap(map, sizeof(map));
+	RemoveStringFromArray(g_OldMapList, map);
 	g_OldMapList.PushString(map);
 				
 	if (g_OldMapList.Length > g_Cvar_ExcludeMaps.IntValue)
@@ -730,7 +731,6 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 	{
 		g_HasVoteStarted = false;
 		delete g_VoteMenu;
-		g_VoteMenu = null;
 		return;
 	}
 	

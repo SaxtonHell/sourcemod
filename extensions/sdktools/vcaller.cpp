@@ -140,6 +140,7 @@ static cell_t PrepSDKCall_SetSignature(IPluginContext *pContext, const cell_t *p
 	|| SOURCE_ENGINE == SE_NUCLEARDAWN \
 	|| SOURCE_ENGINE == SE_BLADE       \
 	|| SOURCE_ENGINE == SE_INSURGENCY  \
+	|| SOURCE_ENGINE == SE_DOI         \
 	|| SOURCE_ENGINE == SE_CSGO
 		s_call_addr = memutils->ResolveSymbol(handle, &sig[1]);
 #else
@@ -158,7 +159,11 @@ static cell_t PrepSDKCall_SetSignature(IPluginContext *pContext, const cell_t *p
 
 static cell_t PrepSDKCall_SetAddress(IPluginContext *pContext, const cell_t *params)
 {
+#ifdef PLATFORM_X86
 	s_call_addr = reinterpret_cast<void *>(params[1]);
+#else
+	s_call_addr = g_pSM->FromPseudoAddress(params[1]);
+#endif
 
 	return (s_call_addr != NULL) ? 1 : 0;
 }
@@ -444,6 +449,11 @@ static cell_t SDKCall(IPluginContext *pContext, const cell_t *params)
 			cell_t *addr;
 			size_t written;
 			pContext->LocalToPhysAddr(params[retparam+1], &addr);
+			if (!(*(char **)vc->retbuf))
+			{
+				pContext->StringToLocalUTF8(params[retparam], *addr, "", &written);
+				return -1;
+			}
 			pContext->StringToLocalUTF8(params[retparam], *addr, *(char **)vc->retbuf, &written);
 			return (cell_t)written;
 		} else if (vc->retinfo->vtype == Valve_Vector
